@@ -13,3 +13,8 @@ uv run python -m osw_eval_core.datasets.webarena
 ```bash
 uv run python src/tty/tty_annotation.py .data/webarena .data/annotations/webarena --annotator-id <your name>
 ```
+
+### To run metric extraction
+```bash
+uv run python -m osw_eval_core.gen_eval.generator
+```
