@@ -7,6 +7,9 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.markdown import Markdown
 from rich.table import Table
+from rich.prompt import Prompt
+from rich.console import Group
+from rich.text import Text
 from rich import print as rprint
 import json
 
@@ -52,6 +55,61 @@ class TTYAnnotator:
                 annotator_id=annotator_id,
                 name=annotator_id  # Using ID as name for simplicity
             )
+
+    def _select_agent(self, instance_id: str) -> str:
+        """Display agent selection menu and return selected agent ID using arrow keys"""
+        import sys
+        import termios
+        import tty
+        
+        def get_key():
+            """Get a single keypress from stdin"""
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(sys.stdin.fileno())
+                ch = sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            return True if ch == '\x03' else ch
+        
+        instance = self.dataset.get_instance_metadata(instance_id)
+        valid_agents = list(instance.agents.keys())
+        current_idx = 0
+        
+        def render_menu():
+            """Render the agent selection menu"""
+            console.clear()
+            console.print("\n[bold]Available Agents:[/bold] (Use ↑↓ arrows to select, Enter to confirm)\n")
+            
+            for idx, agent_id in enumerate(valid_agents):
+                agent_info = instance.agents[agent_id]
+                description = agent_info.model_dump_json()
+                
+                if idx == current_idx:
+                    console.print(f"[bold white on blue] > {agent_id}: {description}[/bold white on blue]")
+                else:
+                    console.print(f"   {agent_id}: {description}")
+        
+        while True:
+            render_menu()
+            key = get_key()
+            
+            if key == '\x1b':  # Arrow key prefix
+                get_key()  # Skip the [
+                arrow = get_key()
+                
+                if arrow == 'A':  # Up arrow
+                    current_idx = (current_idx - 1) % len(valid_agents)
+                elif arrow == 'B':  # Down arrow
+                    current_idx = (current_idx + 1) % len(valid_agents)
+                    
+            elif key == '\r':  # Enter key
+                console.print(f"\n[green]Selected agent:[/green] {valid_agents[current_idx]}")
+                return valid_agents[current_idx]
+            
+            elif key in ('q', '\x03'):  # q or Ctrl+C
+                raise KeyboardInterrupt()
 
     def _format_accessibility_tree(self, html_text: str) -> str:
         """Format accessibility tree for better readability"""
@@ -126,8 +184,10 @@ class TTYAnnotator:
             else:
                 # Pretty print other JSON data
                 json_str = json.dumps(data, indent=2)
-                syntax = Syntax(json_str, "json", theme="monokai")
-                console.print(Panel(syntax, title="Observation (JSON)"))
+                syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
+                # Get console width and adjust panel width
+                width = min(console.width - 2, 120)  # Max width of 120 or console width - 2
+                console.print(Panel(syntax, title="Observation (JSON)", width=width))
             
         elif media_type == MediaType.TEXT:
             # Display text data
@@ -145,8 +205,10 @@ class TTYAnnotator:
         if isinstance(data, dict):
             # Pretty print action data
             json_str = json.dumps(data, indent=2)
-            syntax = Syntax(json_str, "json", theme="monokai")
-            console.print(Panel(syntax, title="Action"))
+            syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
+            # Get console width and adjust panel width
+            width = min(console.width - 2, 120)  # Max width of 120 or console width - 2
+            console.print(Panel(syntax, title="Action", width=width))
         else:
             console.print(Panel(str(data), title="Action"))
 
@@ -171,20 +233,22 @@ class TTYAnnotator:
         console.print(metadata_table)
         console.print("\n")
 
-        # Get all agent trajectories
-        trajectory_points = []
-        for agent_id in instance.agents:
-            trajectory = self.dataset.get_trajectory(instance_id, agent_id)
-            trajectory_points.extend([
-                (point, trajectory.get_data_at(idx))
-                for idx, point in enumerate(trajectory.points)
-            ])
+        # Let user select which agent to annotate
+        selected_agent = self._select_agent(instance_id)
+        
+        # Get selected agent's trajectory
+        trajectory = self.dataset.get_trajectory(instance_id, selected_agent)
+        trajectory_points = [
+            (point, trajectory.get_data_at(idx))
+            for idx, point in enumerate(trajectory.points)
+        ]
         
         # Sort by timestamp
         trajectory_points.sort(key=lambda x: x[0].timestamp)
         
         # Display trajectory
-        console.print(Markdown("### Trajectory"))
+        console.print(Markdown(f"### Trajectory for Agent: {selected_agent}"))
+        console.print("[dim]You can press 's' at any time to skip this instance[/dim]")
         console.print("Press Enter to step through observations and actions...")
         
         start_time = None
@@ -192,9 +256,8 @@ class TTYAnnotator:
             if start_time is None:
                 start_time = point.timestamp
                 
-            # Display timestamp and agent
+            # Display timestamp
             console.print(f"\n[cyan]Time:[/cyan] {point.timestamp}")
-            console.print(f"[cyan]Agent:[/cyan] {point.agent_id}")
             
             # Display point data based on type
             if point.point_type == PointType.OBSERVATION:
@@ -202,17 +265,21 @@ class TTYAnnotator:
             else:
                 self._display_action(data)
             
-            input()  # Wait for user input before showing next point
+            console.print("\nPress Enter to continue, 's' to skip this instance...")
+            user_input = input().lower()
+            if user_input == 's':
+                console.print("\n[yellow]Skipping this instance...[/yellow]")
+                return False  # Return False to indicate skip
         
         # Get annotation
         console.print("\n[bold green]Trajectory complete![/bold green]")
-        console.print("\nPlease provide your feedback on this trajectory:")
+        console.print(f"\nPlease provide your feedback on {selected_agent}'s trajectory:")
         feedback = console.input("\n> ")
         
         # Save annotation
         self.annotation_system.add_annotation(
             instance_id=instance_id,
-            agent_id=next(iter(instance.agents.keys())),  # Use first agent
+            agent_id=selected_agent,
             annotator_id=self.annotator_id,
             content={"feedback": feedback},
             span=AnnotationSpan(
@@ -245,20 +312,43 @@ class TTYAnnotator:
             unannotated_instances = []
             for instance_id in instances:
                 instance = self.dataset.get_instance_metadata(instance_id)
-                trajectory_annotations = self.annotation_system.get_trajectory_annotations(
-                    instance_id=instance_id,
-                    agent_id=next(iter(instance.agents.keys()))
-                )
+                any_agent_unannotated = False
                 
-                if not any(ann.annotator_id == self.annotator_id 
-                          for ann in trajectory_annotations.annotations):
+                # Check each agent for unannotated trajectories
+                for agent_id in instance.agents:
+                    trajectory_annotations = self.annotation_system.get_trajectory_annotations(
+                        instance_id=instance_id,
+                        agent_id=agent_id
+                    )
+                    
+                    if not any(ann.annotator_id == self.annotator_id 
+                              for ann in trajectory_annotations.annotations):
+                        any_agent_unannotated = True
+                        break
+                
+                if any_agent_unannotated:
                     unannotated_instances.append(instance_id)
             
-            # Show progress
-            console.print(f"\n[cyan]Progress: {len(instances) - len(unannotated_instances)}/{len(instances)} instances annotated[/cyan]")
+            # Calculate progress by checking actual annotations
+            total_agent_instances = 0
+            annotated_count = 0
+            
+            for instance_id in instances:
+                instance = self.dataset.get_instance_metadata(instance_id)
+                for agent_id in instance.agents:
+                    total_agent_instances += 1
+                    trajectory_annotations = self.annotation_system.get_trajectory_annotations(
+                        instance_id=instance_id,
+                        agent_id=agent_id
+                    )
+                    if any(ann.annotator_id == self.annotator_id 
+                          for ann in trajectory_annotations.annotations):
+                        annotated_count += 1
+            
+            console.print(f"\n[cyan]Progress: {annotated_count}/{total_agent_instances} agent trajectories annotated[/cyan]")
             
             if not unannotated_instances:
-                console.print("\n[green]All instances have been annotated![/green]")
+                console.print("\n[green]All agent trajectories have been annotated![/green]")
                 break
             
             # Randomly select an instance
@@ -276,7 +366,9 @@ class TTYAnnotator:
             if input().lower() == 'q':
                 break
                 
-            self.annotate_instance(instance_id)
+            completed = self.annotate_instance(instance_id)
+            if completed is False:
+                console.print("\nSkipped instance. Press Enter for next random instance, or 'q' to quit...")
             
             console.print("\nPress Enter for next random instance, or 'q' to quit...")
             if input().lower() == 'q':

@@ -1,9 +1,10 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from enum import Enum
 from pathlib import Path
 import numpy as np
+import numpy.typing as npt
 import h5py
 import json
 
@@ -29,27 +30,23 @@ class MediaReference(BaseModel):
     dtype: Optional[str] = None    # Optional for JSON data
     metadata: dict | None = None
 
-    def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = {}
-
 class MediaStorage:
     """Handles storage and retrieval of both media data and JSON content"""
     def __init__(self, base_path: Path):
         self.base_path = base_path
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self._h5_file = None
+        self._h5_file: h5py.File | None = None
         self._json_path = self.base_path / "json_data"
         self._json_path.mkdir(exist_ok=True)
 
     @property
-    def h5_file(self):
+    def h5_file(self) -> h5py.File:
         if self._h5_file is None:
             self._h5_file = h5py.File(self.base_path / "media_data.h5", "a")
         return self._h5_file
 
     def store_data(self, 
-                  data: Union[np.ndarray, dict, str],
+                  data: Union[npt.ArrayLike, dict[str, Any], str],
                   media_type: MediaType,
                   trajectory_id: str,
                   timestamp: str,
@@ -63,7 +60,7 @@ class MediaStorage:
             return self._store_media(data, media_type, trajectory_id, timestamp, point_type)
 
     def _store_media(self, 
-                    data: np.ndarray,
+                    data: npt.ArrayLike,
                     media_type: MediaType,
                     trajectory_id: str,
                     timestamp: str,
@@ -94,7 +91,7 @@ class MediaStorage:
         )
 
     def _store_json(self,
-                   data: Union[dict, str],
+                   data: dict[str, Any] | str,
                    trajectory_id: str,
                    timestamp: str,
                    point_type: PointType) -> MediaReference:
@@ -245,6 +242,20 @@ class SymmetricTrajectory:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+
+def render_trajectory(trajectory: SymmetricTrajectory):
+    """Render a trajectory as a list of dictionaries"""
+    return [
+        {
+            "timestamp": p.timestamp.isoformat(),
+            "agent_id": p.agent_id,
+            "point_type": p.point_type,
+            "data": trajectory.get_data_at(i),
+            "metadata": p.metadata
+        }
+        for i, p in enumerate(trajectory.points)
+    ]
+
 # Example usage
 def example_mixed_trajectory():
     trajectory = SymmetricTrajectory(
@@ -300,5 +311,12 @@ def example_mixed_trajectory():
         media_type=MediaType.AUDIO,
         metadata={"sample_rate": 16000}
     )
+    
+    print(render_trajectory(trajectory))
 
     trajectory.close()
+
+
+if __name__ == "__main__":
+
+    example_mixed_trajectory()

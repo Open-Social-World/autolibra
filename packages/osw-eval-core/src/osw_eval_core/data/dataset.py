@@ -1,6 +1,7 @@
 import numpy as np
 from pydantic import BaseModel, Field
 from typing import Optional, Union, Any
+from typing_extensions import Self
 from pathlib import Path
 import json
 import yaml
@@ -203,17 +204,17 @@ class MultiAgentDataset:
             metadata=metadata
         )
 
-    def close(self):
+    def close(self) -> None:
         """Close all open trajectories"""
         for instance_trajectories in self._trajectory_cache.values():
             for trajectory in instance_trajectories.values():
                 trajectory.close()
         self._trajectory_cache.clear()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
 # Example usage

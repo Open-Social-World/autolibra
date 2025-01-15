@@ -6,8 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.6",
-    "huggingface-hub>=0.27.1",
-    "osw-eval-core[webarena]",
+    "osw-eval-core[webarena,sotopia]",
     "rich>=13.9.4",
     "typer>=0.15.1",
     "uvicorn>=0.34.0",
@@ -16,6 +15,7 @@ dependencies = [
 [tool.uv]
 dev-dependencies = [
     "ipykernel>=6.29.5",
+    "mypy>=1.14.1",
 ]
 
 [tool.uv.sources]
@@ -23,3 +23,8 @@ osw-eval-core = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "stubs"

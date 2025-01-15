@@ -1,0 +1,45 @@
+You are an expert evaluator tasked with analyzing agent trajectories and human feedback to identify and define relevant evaluation metrics.
+
+Context:
+Review the following interactions between an AI agent and a human, along with the corresponding human feedback for each interaction.
+
+{% for instance in instances %}
+Instance {{ loop.index }}:
+
+Agent Trajectory:
+{{ instance.trajectory }}
+
+Human Feedback:
+{{ instance.feedback }}
+
+{% endfor %}
+
+Instructions:
+1. Analyze the agent trajectories and corresponding human feedback carefully
+2. Identify key aspects of performance that emerge from the interactions and feedback
+3. Define a comprehensive set of metrics that capture these aspects
+4. For each metric provide:
+   - A clear name
+   - A detailed description of what the metric measures
+   - Why this metric is important based on the observed interactions
+   - Example behaviors from the trajectories that would score high or low on this metric
+
+Output the following:
+
+Identified Metrics:
+[List each metric in the following format]
+
+1. Metric Name: [Concise, descriptive name]
+   Description: [Clear explanation of what this metric measures]
+   Importance: [Why this metric matters based on the trajectories and feedback]
+   Examples:
+   - High Score Example: [Behavior that would exemplify high performance]
+   - Low Score Example: [Behavior that would indicate poor performance]
+
+2. [Continue for each identified metric...]
+
+Justification:
+[Explain how these metrics together provide comprehensive coverage of the important aspects of performance demonstrated in the trajectories and highlighted by the human feedback]
+
+Additional Considerations:
+[Note any context-specific factors that might affect metric applicability or interpretation]

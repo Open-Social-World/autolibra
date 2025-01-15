@@ -1,6 +1,6 @@
 from .dataset_loader import BalrogNLEDatasetLoader, BalrogMiniHackDatasetLoader, BalrogCrafterDatasetLoader, BalrogBabaIsAIDatasetLoader
 
-from .dataset import MultiAgentDataset
+from .dataset import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from .trajectory import SymmetricTrajectory, TrajectoryPoint
 from .annotation import Annotation, AnnotationSpan, Annotator, AnnotationSystem
 
@@ -15,5 +15,8 @@ __all__ = [
     "Annotator",
     "AnnotationSystem",
     "SymmetricTrajectory",
-    "TrajectoryPoint"
+    "TrajectoryPoint",
+    "AgentMetadata",
+    "MediaType",
+    "PointType",
 ]

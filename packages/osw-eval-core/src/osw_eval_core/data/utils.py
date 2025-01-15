@@ -16,7 +16,7 @@ from rich.text import Text
 from rich import box
 
 
-def download_github_folder(owner: str, repo: str, path: str, save_path: str, token=None):
+def download_github_folder(owner: str, repo: str, path: str, save_path: str, token: str | None =None) -> None:
     """
     Recursively download a folder from GitHub
     
@@ -92,7 +92,7 @@ def file_pairs(folder_path: str) -> Generator[Tuple[Path, Path], None, None]:
             yield csv_file, json_file
 
 
-def parse_text_description(text_description):
+def parse_text_description(text_description: str) -> list[tuple[tuple[int, int], str]]:
     """
     Parse a text description of object positions relative to a reference point
     and convert it back into a list of relative positions and object names.
@@ -168,7 +168,7 @@ def parse_text_description(text_description):
     
     return relative_positions
 
-def visualize_map(relative_positions, reference_char='@'):
+def visualize_map(relative_positions: list[tuple[tuple[int, int], str]], reference_char: str='@') -> None:
     """
     Visualize the game map using rich library for prettier output.
     
@@ -225,7 +225,7 @@ def visualize_map(relative_positions, reference_char='@'):
         )
     
     # Helper function to get styled symbol for object
-    def get_styled_symbol(name):
+    def get_styled_symbol(name: str) -> Text:
         name = name.lower()
         if name.startswith('rule'):
             if '`' in name:
@@ -243,7 +243,7 @@ def visualize_map(relative_positions, reference_char='@'):
     
     # Create the grid with objects
     for y in range(min_y, max_y + 1):
-        row = [str(y)]  # Y-coordinate
+        row: list[str | Text] = [str(y)]  # Y-coordinate
         for x in range(min_x, max_x + 1):
             cell_content = Text(" ")  # Empty cell by default
             
