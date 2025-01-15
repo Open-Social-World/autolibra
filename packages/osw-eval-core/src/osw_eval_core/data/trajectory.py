@@ -8,8 +8,10 @@ import numpy.typing as npt
 import h5py
 import json
 
+
 class MediaType(str, Enum):
     """Types of media data supported"""
+
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
@@ -17,21 +19,27 @@ class MediaType(str, Enum):
     NUMPY = "numpy"
     JSON = "json"
 
+
 class PointType(str, Enum):
     """Type of trajectory point"""
+
     OBSERVATION = "observation"
     ACTION = "action"
 
+
 class MediaReference(BaseModel):
     """Reference to media data stored on disk"""
+
     media_type: MediaType
     file_path: Path
     shape: Optional[tuple] = None  # Optional for JSON data
-    dtype: Optional[str] = None    # Optional for JSON data
+    dtype: Optional[str] = None  # Optional for JSON data
     metadata: dict | None = None
+
 
 class MediaStorage:
     """Handles storage and retrieval of both media data and JSON content"""
+
     def __init__(self, base_path: Path):
         self.base_path = base_path
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -45,39 +53,44 @@ class MediaStorage:
             self._h5_file = h5py.File(self.base_path / "media_data.h5", "a")
         return self._h5_file
 
-    def store_data(self, 
-                  data: Union[npt.ArrayLike, dict[str, Any], str],
-                  media_type: MediaType,
-                  trajectory_id: str,
-                  timestamp: str,
-                  point_type: PointType) -> MediaReference:
+    def store_data(
+        self,
+        data: Union[npt.ArrayLike, dict[str, Any], str],
+        media_type: MediaType,
+        trajectory_id: str,
+        timestamp: str,
+        point_type: PointType,
+    ) -> MediaReference:
         """Store either media data or JSON content"""
         if media_type == MediaType.JSON:
-            assert isinstance(data, (dict, str)), "JSON data must be a dictionary or string"
+            assert isinstance(
+                data, (dict, str)
+            ), "JSON data must be a dictionary or string"
             return self._store_json(data, trajectory_id, timestamp, point_type)
         else:
             assert isinstance(data, np.ndarray), "Media data must be a NumPy"
-            return self._store_media(data, media_type, trajectory_id, timestamp, point_type)
+            return self._store_media(
+                data, media_type, trajectory_id, timestamp, point_type
+            )
 
-    def _store_media(self, 
-                    data: npt.ArrayLike,
-                    media_type: MediaType,
-                    trajectory_id: str,
-                    timestamp: str,
-                    point_type: PointType) -> MediaReference:
+    def _store_media(
+        self,
+        data: npt.ArrayLike,
+        media_type: MediaType,
+        trajectory_id: str,
+        timestamp: str,
+        point_type: PointType,
+    ) -> MediaReference:
         """Store media data in HDF5"""
         dataset_path = f"{trajectory_id}/{point_type}/{timestamp}"
-        
+
         if dataset_path in self.h5_file:
             del self.h5_file[dataset_path]
-        
+
         _ = self.h5_file.create_dataset(
-            dataset_path,
-            data=data,
-            compression="gzip",
-            compression_opts=4
+            dataset_path, data=data, compression="gzip", compression_opts=4
         )
-        
+
         return MediaReference(
             media_type=media_type,
             file_path=self.base_path / "media_data.h5",
@@ -86,31 +99,33 @@ class MediaStorage:
             metadata={
                 "dataset_path": dataset_path,
                 "compression": "gzip",
-                "compression_level": 4
-            }
+                "compression_level": 4,
+            },
         )
 
-    def _store_json(self,
-                   data: dict[str, Any] | str,
-                   trajectory_id: str,
-                   timestamp: str,
-                   point_type: PointType) -> MediaReference:
+    def _store_json(
+        self,
+        data: dict[str, Any] | str,
+        trajectory_id: str,
+        timestamp: str,
+        point_type: PointType,
+    ) -> MediaReference:
         """Store JSON data"""
         json_file = self._json_path / f"{trajectory_id}_{point_type}_{timestamp}.json"
-        
-        with open(json_file, 'w') as f:
+
+        with open(json_file, "w") as f:
             json.dump(data, f)
-        
+
         return MediaReference(
             media_type=MediaType.JSON,
             file_path=json_file,
-            metadata={"timestamp": timestamp}
+            metadata={"timestamp": timestamp},
         )
 
     def load_data(self, reference: MediaReference) -> Union[np.ndarray, dict]:
         """Load either media or JSON data from reference"""
         if reference.media_type == MediaType.JSON:
-            with open(reference.file_path, 'r') as f:
+            with open(reference.file_path, "r") as f:
                 return json.load(f)
         else:
             dataset_path = reference.metadata["dataset_path"]
@@ -121,10 +136,12 @@ class MediaStorage:
             self._h5_file.close()
             self._h5_file = None
 
+
 class TrajectoryPoint(BaseModel):
     """
     Single point in a trajectory that can be either observation or action
     """
+
     timestamp: datetime
     agent_id: str
     point_type: PointType
@@ -134,16 +151,16 @@ class TrajectoryPoint(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+
 class SymmetricTrajectory:
     """Trajectory with symmetric handling of observations and actions"""
-    def __init__(self, 
-                 trajectory_id: str,
-                 storage_path: Path):
+
+    def __init__(self, trajectory_id: str, storage_path: Path):
         self.trajectory_id = trajectory_id
         self.media_storage = MediaStorage(storage_path)
         self.points: list[TrajectoryPoint] = []
         self.points_file = storage_path / "points.json"
-        
+
         # Load points if they exist
         self._load_points()
 
@@ -151,15 +168,17 @@ class SymmetricTrajectory:
         """Load trajectory points from disk"""
         if self.points_file.exists():
             try:
-                with open(self.points_file, 'r') as f:
+                with open(self.points_file, "r") as f:
                     points_data = json.load(f)
                     self.points = [
                         TrajectoryPoint(
-                            timestamp=datetime.fromisoformat(p['timestamp']),
-                            agent_id=p['agent_id'],
-                            point_type=PointType(p['point_type']),
-                            data_reference=MediaReference.model_validate_json(p['data_reference']),
-                            metadata=p.get('metadata', {})
+                            timestamp=datetime.fromisoformat(p["timestamp"]),
+                            agent_id=p["agent_id"],
+                            point_type=PointType(p["point_type"]),
+                            data_reference=MediaReference.model_validate_json(
+                                p["data_reference"]
+                            ),
+                            metadata=p.get("metadata", {}),
                         )
                         for p in points_data
                     ]
@@ -170,42 +189,44 @@ class SymmetricTrajectory:
         """Save trajectory points to disk"""
         points_data = [
             {
-                'timestamp': p.timestamp.isoformat(),
-                'agent_id': p.agent_id,
-                'point_type': p.point_type.value,
-                'data_reference': p.data_reference.model_dump_json(),
-                'metadata': p.metadata
+                "timestamp": p.timestamp.isoformat(),
+                "agent_id": p.agent_id,
+                "point_type": p.point_type.value,
+                "data_reference": p.data_reference.model_dump_json(),
+                "metadata": p.metadata,
             }
             for p in self.points
         ]
-        
-        with open(self.points_file, 'w') as f:
+
+        with open(self.points_file, "w") as f:
             json.dump(points_data, f, indent=2)
 
-    def add_point(self,
-                 timestamp: datetime,
-                 agent_id: str,
-                 point_type: PointType,
-                 data: Union[np.ndarray, dict, str],
-                 media_type: MediaType,
-                 metadata: Optional[dict] = None) -> None:
+    def add_point(
+        self,
+        timestamp: datetime,
+        agent_id: str,
+        point_type: PointType,
+        data: Union[np.ndarray, dict, str],
+        media_type: MediaType,
+        metadata: Optional[dict] = None,
+    ) -> None:
         """Add either observation or action point"""
         data_reference = self.media_storage.store_data(
             data=data,
             media_type=media_type,
             trajectory_id=self.trajectory_id,
             timestamp=timestamp.isoformat(),
-            point_type=point_type
+            point_type=point_type,
         )
-        
+
         point = TrajectoryPoint(
             timestamp=timestamp,
             agent_id=agent_id,
             point_type=point_type,
             data_reference=data_reference,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
-        
+
         self.points.append(point)
         self._save_points()  # Save after each addition
 
@@ -222,14 +243,11 @@ class SymmetricTrajectory:
         """Get all points for a specific agent"""
         return [p for p in self.points if p.agent_id == agent_id]
 
-    def get_points_in_timerange(self, 
-                              start_time: datetime, 
-                              end_time: datetime) -> list[TrajectoryPoint]:
+    def get_points_in_timerange(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[TrajectoryPoint]:
         """Get points within a time range"""
-        return [
-            p for p in self.points 
-            if start_time <= p.timestamp <= end_time
-        ]
+        return [p for p in self.points if start_time <= p.timestamp <= end_time]
 
     def close(self):
         """Close media storage and ensure points are saved"""
@@ -251,16 +269,16 @@ def render_trajectory(trajectory: SymmetricTrajectory):
             "agent_id": p.agent_id,
             "point_type": p.point_type,
             "data": trajectory.get_data_at(i),
-            "metadata": p.metadata
+            "metadata": p.metadata,
         }
         for i, p in enumerate(trajectory.points)
     ]
 
+
 # Example usage
 def example_mixed_trajectory():
     trajectory = SymmetricTrajectory(
-        trajectory_id="robot_1",
-        storage_path=Path("./data/trajectories")
+        trajectory_id="robot_1", storage_path=Path("./data/trajectories")
     )
 
     # Add an observation with image data
@@ -271,34 +289,28 @@ def example_mixed_trajectory():
         point_type=PointType.OBSERVATION,
         data=image,
         media_type=MediaType.IMAGE,
-        metadata={"camera_id": "cam_1"}
+        metadata={"camera_id": "cam_1"},
     )
 
     # Add an action with JSON data
-    action = {
-        "command": "move",
-        "parameters": {"direction": "forward", "speed": 1.0}
-    }
+    action = {"command": "move", "parameters": {"direction": "forward", "speed": 1.0}}
     trajectory.add_point(
         timestamp=datetime.now(),
         agent_id="robot_1",
         point_type=PointType.ACTION,
         data=action,
         media_type=MediaType.JSON,
-        metadata={"priority": "high"}
+        metadata={"priority": "high"},
     )
 
     # Add an observation with JSON data
-    json_obs = {
-        "position": [1.0, 2.0, 3.0],
-        "orientation": [0.0, 0.0, 1.0]
-    }
+    json_obs = {"position": [1.0, 2.0, 3.0], "orientation": [0.0, 0.0, 1.0]}
     trajectory.add_point(
         timestamp=datetime.now(),
         agent_id="robot_1",
         point_type=PointType.OBSERVATION,
         data=json_obs,
-        media_type=MediaType.JSON
+        media_type=MediaType.JSON,
     )
 
     # Add an action with audio data
@@ -309,14 +321,13 @@ def example_mixed_trajectory():
         point_type=PointType.ACTION,
         data=audio_command,
         media_type=MediaType.AUDIO,
-        metadata={"sample_rate": 16000}
+        metadata={"sample_rate": 16000},
     )
-    
+
     print(render_trajectory(trajectory))
 
     trajectory.close()
 
 
 if __name__ == "__main__":
-
     example_mixed_trajectory()

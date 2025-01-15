@@ -93,7 +93,7 @@ const AnnotationInterface = () => {
         <CardContent>
           <p className="text-lg font-medium mb-2">Task Description:</p>
           <p className="mb-4">{currentInstance.task}</p>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="font-medium">Instance ID: {currentInstance.id}</p>
@@ -114,8 +114,8 @@ const AnnotationInterface = () => {
                 <div className="font-medium">{step.type}</div>
                 <div className="text-sm">{step.content}</div>
                 {step.screenshot && (
-                  <img 
-                    src={step.screenshot} 
+                  <img
+                    src={step.screenshot}
                     alt={`Step ${index}`}
                     className="mt-2 max-w-full h-auto"
                   />
@@ -145,13 +145,13 @@ const AnnotationInterface = () => {
             </div>
 
             <div className="flex space-x-4">
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
                 Submit Feedback
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={loadRandomInstance}
                 disabled={isSubmitting}

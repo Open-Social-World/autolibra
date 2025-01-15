@@ -1,4 +1,9 @@
-from .dataset_loader import BalrogNLEDatasetLoader, BalrogMiniHackDatasetLoader, BalrogCrafterDatasetLoader, BalrogBabaIsAIDatasetLoader
+from .dataset_loader import (
+    BalrogNLEDatasetLoader,
+    BalrogMiniHackDatasetLoader,
+    BalrogCrafterDatasetLoader,
+    BalrogBabaIsAIDatasetLoader,
+)
 
 from .dataset import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from .trajectory import SymmetricTrajectory, TrajectoryPoint

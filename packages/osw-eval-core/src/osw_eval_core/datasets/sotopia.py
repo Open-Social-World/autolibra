@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 from ..data import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from .base import BaseConverter, run_converter
 
-from huggingface_hub import hf_hub_download # type:ignore[import-untyped]
+from huggingface_hub import hf_hub_download  # type:ignore[import-untyped]
+
 
 class TwoAgentEpisodeWithScenarioBackgroundGoals(BaseModel):
     episode_id: str = Field()
@@ -34,7 +35,12 @@ class SotopiaConverter(BaseConverter):
 
         # Download trajectory file
         if not (self.source_path / "sotopia_episodes_v1_hf.jsonl").exists():
-            hf_hub_download(repo_id="cmu-lti/sotopia", filename="sotopia_episodes_v1_hf.jsonl", repo_type="dataset", local_dir=self.source_path)
+            hf_hub_download(
+                repo_id="cmu-lti/sotopia",
+                filename="sotopia_episodes_v1_hf.jsonl",
+                repo_type="dataset",
+                local_dir=self.source_path,
+            )
 
     def convert_to_dataset(self) -> None:
         """Convert entire Sotopia dataset"""
@@ -43,12 +49,14 @@ class SotopiaConverter(BaseConverter):
         dataset = MultiAgentDataset(
             name="Sotopia Interaction",
             base_path=self.output_path,
-            description="Sotopia dialog interactions"
+            description="Sotopia dialog interactions",
         )
-        
+
         with open(self.source_path / "sotopia_episodes_v1.jsonl", "r") as f:
             for line in f:
-                episode = TwoAgentEpisodeWithScenarioBackgroundGoals.model_validate_json(line)
+                episode = (
+                    TwoAgentEpisodeWithScenarioBackgroundGoals.model_validate_json(line)
+                )
 
                 agent_names = episode.agents_background.keys()
                 agent_backgrounds = episode.agents_background
@@ -58,30 +66,37 @@ class SotopiaConverter(BaseConverter):
                     agents_metadata[agent_name] = AgentMetadata(
                         agent_id=agent_name,
                         agent_type="sotopia_agent",
-                        capabilities=["speek", "non-verbal communication", "physical actions"],
-                        parameters={"background": agent_backgrounds[agent_name]}
+                        capabilities=[
+                            "speek",
+                            "non-verbal communication",
+                            "physical actions",
+                        ],
+                        parameters={"background": agent_backgrounds[agent_name]},
                     )
                 instance_id = episode.episode_id
-                
+
                 instance_metadata = {
                     "scenario": episode.scenario,
                     "experiment_tag": episode.experiment_tag,
                     "models": models,
-                    "rewards": episode.rewards
+                    "rewards": episode.rewards,
                 }
-                if models != ["gpt-4", "gpt-4", "gpt-4"]: 
-                    self.logger.info(f"Skipping instance {instance_id} because of model mismatch")
+                if models != ["gpt-4", "gpt-4", "gpt-4"]:
+                    self.logger.info(
+                        f"Skipping instance {instance_id} because of model mismatch"
+                    )
                     continue
 
                 for rewards in episode.rewards:
                     overall_reward = rewards["overall_score"]
                     if overall_reward < 1.6:
-                        self.logger.info(f"Skipping instance {instance_id} because of low reward")
+                        self.logger.info(
+                            f"Skipping instance {instance_id} because of low reward"
+                        )
                         continue
-                
+
                 instance_id = dataset.create_instance(
-                    agents_metadata = agents_metadata,
-                    instance_metadata=instance_metadata
+                    agents_metadata=agents_metadata, instance_metadata=instance_metadata
                 )
 
                 for turn in episode.raw_messages:
@@ -95,7 +110,7 @@ class SotopiaConverter(BaseConverter):
                                 point_type=PointType.OBSERVATION,
                                 data={"content": message},
                                 media_type=MediaType.JSON,
-                                timestamp=timestamp
+                                timestamp=timestamp,
                             )
                         elif message != "did nothing":
                             dataset.add_data_point(
@@ -104,12 +119,12 @@ class SotopiaConverter(BaseConverter):
                                 point_type=PointType.ACTION,
                                 data={"content": message},
                                 media_type=MediaType.JSON,
-                                timestamp=action_timestamp
+                                timestamp=action_timestamp,
                             )
 
         dataset.close()
-        
-                
+
+
 if __name__ == "__main__":
     source_path = Path(".data/raw/sotopia")
     output_path = Path(".data/sotopia")
