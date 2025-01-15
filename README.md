@@ -2,11 +2,26 @@
 
 ## Contributor doc
 
-### WebArena
+### Prepare the data
+
+#### From scratch
+For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/osw-eval`. This is for new dataset that you have created.
 
 ```bash
-# Download and preprocess webarena
-uv run python -m osw_eval_core.datasets.webarena
+# Download and preprocess <dataset>
+uv run python -m osw_eval_core.datasets.<dataset>
+```
+
+#### Download from huggingface
+
+```bash
+huggingface-cli download --repo-type dataset open-social-world/osw-eval --local-dir .data
+```
+
+#### Upload your data to huggingface
+
+```bash
+huggingface-cli upload-large-folder --repo-type dataset open-social-world/osw-eval .data
 ```
 
 ### Annotation
