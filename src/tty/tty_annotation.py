@@ -239,11 +239,11 @@ class TTYAnnotator:
         for key, value in instance.metadata.items():
             metadata_table.add_row(str(key), str(value))
 
-        console.print(metadata_table)
-        console.print("\n")
-
         # Let user select which agent to annotate
         selected_agent = self._select_agent(instance_id)
+
+        console.print(metadata_table)
+        console.print("\n")
 
         # Get selected agent's trajectory
         trajectory = self.dataset.get_trajectory(instance_id, selected_agent)
@@ -274,11 +274,16 @@ class TTYAnnotator:
             else:
                 self._display_action(data)
 
-            console.print("\nPress Enter to continue, 's' to skip this instance...")
+            console.print(
+                "\nPress Enter to continue, 's' to skip this instance, 'q' to quit annotation..."
+            )
             user_input = input().lower()
             if user_input == "s":
                 console.print("\n[yellow]Skipping this instance...[/yellow]")
                 return False  # Return False to indicate skip
+            elif user_input == "q":
+                console.print("\n[red]Quit Annotation...[/red]")
+                raise KeyboardInterrupt()
 
         # Get annotation
         console.print("\n[bold green]Trajectory complete![/bold green]")
