@@ -21,6 +21,7 @@ dev-dependencies = [
 
 [tool.uv.sources]
 osw-eval-core = { workspace = true }
+osw-data = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]

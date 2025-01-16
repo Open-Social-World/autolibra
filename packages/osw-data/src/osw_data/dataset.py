@@ -1,12 +1,13 @@
-import numpy as np
 from pydantic import BaseModel, Field
-from typing import Optional, Union, Any
+from typing import Optional, Any
 from typing_extensions import Self
 from pathlib import Path
 import json
 import yaml
 from datetime import datetime
 from uuid import uuid4
+
+import numpy.typing as npt
 
 # Assume we're importing from the previous trajectory implementation
 from .trajectory import SymmetricTrajectory, PointType, MediaType
@@ -87,7 +88,7 @@ class MultiAgentDataset:
             self._save_metadata(metadata)
             return metadata
 
-    def _save_metadata(self, metadata: DatasetMetadata):
+    def _save_metadata(self, metadata: DatasetMetadata) -> None:
         """Save dataset metadata to disk"""
         with open(self.metadata_path, "w") as f:
             yaml.dump(json.loads(metadata.model_dump_json()), f)
@@ -193,10 +194,10 @@ class MultiAgentDataset:
         agent_id: str,
         timestamp: datetime,
         point_type: PointType,
-        data: Union[np.ndarray, dict, str],
+        data: npt.NDArray[Any] | dict[str, Any] | str,
         media_type: MediaType,
-        metadata: Optional[dict] = None,
-    ):
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Add a data point to a specific agent's trajectory"""
         trajectory = self.get_trajectory(instance_id, agent_id)
         trajectory.add_point(
@@ -220,65 +221,3 @@ class MultiAgentDataset:
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
-
-
-# Example usage
-def example_dataset():
-    # Create a new dataset
-    dataset = MultiAgentDataset(
-        name="Robot Interaction Dataset",
-        base_path=Path("./data/robot_dataset"),
-        description="Multi-agent robot interaction scenarios",
-        version="1.0",
-    )
-
-    # Define agents for an instance
-    agents_metadata = {
-        "robot_1": AgentMetadata(
-            agent_id="robot_1",
-            agent_type="manipulator",
-            capabilities=["grasp", "move"],
-            parameters={"max_speed": 1.0},
-        ),
-        "robot_2": AgentMetadata(
-            agent_id="robot_2",
-            agent_type="mobile_base",
-            capabilities=["navigate"],
-            parameters={"max_velocity": 0.5},
-        ),
-    }
-
-    # Create an instance
-    instance_id = dataset.create_instance(
-        agents_metadata=agents_metadata,
-        instance_metadata={"scenario": "collaborative_assembly"},
-    )
-
-    # Add data points for each agent
-    timestamp = datetime.now()
-
-    # Add observation for robot_1
-    image_data = np.random.rand(480, 640, 3)
-    dataset.add_data_point(
-        instance_id=instance_id,
-        agent_id="robot_1",
-        timestamp=timestamp,
-        point_type=PointType.OBSERVATION,
-        data=image_data,
-        media_type=MediaType.IMAGE,
-        metadata={"camera_id": "cam_1"},
-    )
-
-    # Add action for robot_2
-    action_data = {"command": "move_to", "position": [1.0, 2.0, 0.0]}
-    dataset.add_data_point(
-        instance_id=instance_id,
-        agent_id="robot_2",
-        timestamp=timestamp,
-        point_type=PointType.ACTION,
-        data=action_data,
-        media_type=MediaType.JSON,
-    )
-
-    # Close the dataset
-    dataset.close()

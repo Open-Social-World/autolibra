@@ -1,11 +1,12 @@
+from uuid import uuid4
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Any, Optional, Union
+from typing_extensions import Self
 from enum import Enum
 from pathlib import Path
 import numpy as np
 import numpy.typing as npt
-import h5py
 import json
 
 
@@ -32,9 +33,9 @@ class MediaReference(BaseModel):
 
     media_type: MediaType
     file_path: Path
-    shape: Optional[tuple] = None  # Optional for JSON data
+    shape: tuple[int, ...] | None = None  # Optional for JSON data
     dtype: Optional[str] = None  # Optional for JSON data
-    metadata: dict | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class MediaStorage:
@@ -43,15 +44,8 @@ class MediaStorage:
     def __init__(self, base_path: Path):
         self.base_path = base_path
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self._h5_file: h5py.File | None = None
         self._json_path = self.base_path / "json_data"
         self._json_path.mkdir(exist_ok=True)
-
-    @property
-    def h5_file(self) -> h5py.File:
-        if self._h5_file is None:
-            self._h5_file = h5py.File(self.base_path / "media_data.h5", "a")
-        return self._h5_file
 
     def store_data(
         self,
@@ -69,38 +63,28 @@ class MediaStorage:
             return self._store_json(data, trajectory_id, timestamp, point_type)
         else:
             assert isinstance(data, np.ndarray), "Media data must be a NumPy"
-            return self._store_media(
+            return self._store_numpy(
                 data, media_type, trajectory_id, timestamp, point_type
             )
 
-    def _store_media(
+    def _store_numpy(
         self,
-        data: npt.ArrayLike,
+        data: npt.NDArray[Any],
         media_type: MediaType,
         trajectory_id: str,
         timestamp: str,
         point_type: PointType,
     ) -> MediaReference:
         """Store media data in HDF5"""
-        dataset_path = f"{trajectory_id}/{point_type}/{timestamp}"
+        data_path = f"{trajectory_id}/{point_type}/{timestamp}/{uuid4()}.npy"
 
-        if dataset_path in self.h5_file:
-            del self.h5_file[dataset_path]
-
-        _ = self.h5_file.create_dataset(
-            dataset_path, data=data, compression="gzip", compression_opts=4
-        )
+        np.save(self.base_path / data_path, data)
 
         return MediaReference(
             media_type=media_type,
-            file_path=self.base_path / "media_data.h5",
+            file_path=self.base_path / data_path,
             shape=data.shape,
             dtype=str(data.dtype),
-            metadata={
-                "dataset_path": dataset_path,
-                "compression": "gzip",
-                "compression_level": 4,
-            },
         )
 
     def _store_json(
@@ -122,19 +106,23 @@ class MediaStorage:
             metadata={"timestamp": timestamp},
         )
 
-    def load_data(self, reference: MediaReference) -> Union[np.ndarray, dict]:
+    def load_data(
+        self, reference: MediaReference
+    ) -> npt.NDArray[Any] | dict[str, Any] | str:
         """Load either media or JSON data from reference"""
         if reference.media_type == MediaType.JSON:
             with open(reference.file_path, "r") as f:
-                return json.load(f)
+                json_data = json.load(f)
+                assert isinstance(json_data, (dict, str)), "Invalid JSON data"
+                return json_data
         else:
-            dataset_path = reference.metadata["dataset_path"]
-            return self.h5_file[dataset_path][:]
+            data_path = reference.file_path
+            data = np.load(data_path)
+            assert isinstance(data, np.ndarray), "Invalid NumPy data"
+            return data
 
-    def close(self):
-        if self._h5_file is not None:
-            self._h5_file.close()
-            self._h5_file = None
+    def close(self) -> None:
+        pass
 
 
 class TrajectoryPoint(BaseModel):
@@ -146,7 +134,7 @@ class TrajectoryPoint(BaseModel):
     agent_id: str
     point_type: PointType
     data_reference: MediaReference
-    metadata: dict = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True
@@ -206,9 +194,9 @@ class SymmetricTrajectory:
         timestamp: datetime,
         agent_id: str,
         point_type: PointType,
-        data: Union[np.ndarray, dict, str],
+        data: npt.NDArray[Any] | dict[str, Any] | str,
         media_type: MediaType,
-        metadata: Optional[dict] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add either observation or action point"""
         data_reference = self.media_storage.store_data(
@@ -230,7 +218,7 @@ class SymmetricTrajectory:
         self.points.append(point)
         self._save_points()  # Save after each addition
 
-    def get_data_at(self, index: int) -> Union[np.ndarray, dict]:
+    def get_data_at(self, index: int) -> npt.NDArray[Any] | dict[str, Any] | str:
         """Load data for a specific trajectory point"""
         point = self.points[index]
         return self.media_storage.load_data(point.data_reference)
@@ -249,19 +237,19 @@ class SymmetricTrajectory:
         """Get points within a time range"""
         return [p for p in self.points if start_time <= p.timestamp <= end_time]
 
-    def close(self):
+    def close(self) -> None:
         """Close media storage and ensure points are saved"""
         self._save_points()
         self.media_storage.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
 
-def render_trajectory(trajectory: SymmetricTrajectory):
+def render_trajectory(trajectory: SymmetricTrajectory) -> list[dict[str, Any]]:
     """Render a trajectory as a list of dictionaries"""
     return [
         {
@@ -273,61 +261,3 @@ def render_trajectory(trajectory: SymmetricTrajectory):
         }
         for i, p in enumerate(trajectory.points)
     ]
-
-
-# Example usage
-def example_mixed_trajectory():
-    trajectory = SymmetricTrajectory(
-        trajectory_id="robot_1", storage_path=Path("./data/trajectories")
-    )
-
-    # Add an observation with image data
-    image = np.random.rand(480, 640, 3)
-    trajectory.add_point(
-        timestamp=datetime.now(),
-        agent_id="robot_1",
-        point_type=PointType.OBSERVATION,
-        data=image,
-        media_type=MediaType.IMAGE,
-        metadata={"camera_id": "cam_1"},
-    )
-
-    # Add an action with JSON data
-    action = {"command": "move", "parameters": {"direction": "forward", "speed": 1.0}}
-    trajectory.add_point(
-        timestamp=datetime.now(),
-        agent_id="robot_1",
-        point_type=PointType.ACTION,
-        data=action,
-        media_type=MediaType.JSON,
-        metadata={"priority": "high"},
-    )
-
-    # Add an observation with JSON data
-    json_obs = {"position": [1.0, 2.0, 3.0], "orientation": [0.0, 0.0, 1.0]}
-    trajectory.add_point(
-        timestamp=datetime.now(),
-        agent_id="robot_1",
-        point_type=PointType.OBSERVATION,
-        data=json_obs,
-        media_type=MediaType.JSON,
-    )
-
-    # Add an action with audio data
-    audio_command = np.random.rand(16000)  # 1 second of audio at 16kHz
-    trajectory.add_point(
-        timestamp=datetime.now(),
-        agent_id="robot_1",
-        point_type=PointType.ACTION,
-        data=audio_command,
-        media_type=MediaType.AUDIO,
-        metadata={"sample_rate": 16000},
-    )
-
-    print(render_trajectory(trajectory))
-
-    trajectory.close()
-
-
-if __name__ == "__main__":
-    example_mixed_trajectory()

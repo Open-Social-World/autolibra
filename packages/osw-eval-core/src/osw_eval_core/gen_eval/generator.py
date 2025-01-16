@@ -1,16 +1,18 @@
 from pathlib import Path
+from typing import Any
+from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.vertexai import VertexAIModel
 from importlib import resources
 
-from ..data import MultiAgentDataset, AnnotationSystem, SymmetricTrajectory
+from osw_data import MultiAgentDataset, AnnotationSystem, SymmetricTrajectory
 
 import jinja2
 
 
 def load_template() -> jinja2.Template:
     with resources.files("osw_eval_core.templates").joinpath(
-        "generate_metrics.j2"
+        "generate_metrics_v2.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())
 
@@ -24,11 +26,18 @@ def render_webarena_trajectory(trajectory: SymmetricTrajectory) -> str:
     )
 
 
+class Metric(BaseModel):
+    name: str
+    explanation: str
+    good_behavior: list[str]
+    bad_behavior: list[str]
+
+
 if __name__ == "__main__":
     template = load_template()
 
-    dataset_path = Path(".data/sotopia")
-    annotation_path = Path(".data/annotations/sotopia")
+    dataset_path = Path(".data/cogym")
+    annotation_path = Path(".data/annotations/cogym")
 
     dataset = MultiAgentDataset(
         name="dataset",  # This will be loaded from metadata
@@ -40,7 +49,7 @@ if __name__ == "__main__":
         dataset_path=dataset_path,
         project_name="Trajectory Annotation Project",
         description="Free-form text annotations of agent trajectories",
-        schema={
+        annotation_schema={
             "feedback": {
                 "type": "string",
                 "description": "Free-form text feedback on the trajectory",
@@ -48,7 +57,7 @@ if __name__ == "__main__":
         },
     )
 
-    instances: list[dict[str, str]] = []
+    instances: list[dict[str, Any]] = []
 
     for instance_id in dataset.list_instances():
         instance = dataset.get_instance_metadata(instance_id)
@@ -71,10 +80,10 @@ if __name__ == "__main__":
                 )
 
     # Generate the metrics
-    prompt = template.render(instances=instances)
+    prompt = template.render(instances=instances[:50])
 
     model = VertexAIModel("gemini-2.0-flash-exp")
-    agent = Agent(model)
+    agent = Agent(model, result_type=list[Metric])
 
     result = agent.run_sync(prompt)
     print(result.data)

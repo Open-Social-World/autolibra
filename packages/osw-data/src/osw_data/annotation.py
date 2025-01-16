@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, Any
 from pathlib import Path
 from datetime import datetime
-import json
 import yaml
 from uuid import uuid4
 
@@ -57,7 +56,7 @@ class AnnotationProject(BaseModel):
     name: str
     description: str
     dataset_path: Path
-    schema: dict[str, Any]  # Defines the expected annotation structure
+    annotation_schema: dict[str, Any]  # Defines the expected annotation structure
     guidelines: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -76,7 +75,7 @@ class AnnotationSystem:
         dataset_path: Path,
         project_name: str,
         description: str = "",
-        schema: Optional[dict[str, Any]] = None,
+        annotation_schema: Optional[dict[str, Any]] = None,
     ):
         self.base_path = Path(base_path)
         self.annotations_path = self.base_path / "annotations"
@@ -88,11 +87,15 @@ class AnnotationSystem:
 
         # Initialize or load project metadata
         self.project = self._init_project(
-            project_name, description, dataset_path, schema or {}
+            project_name, description, dataset_path, annotation_schema or {}
         )
 
     def _init_project(
-        self, name: str, description: str, dataset_path: Path, schema: dict[str, Any]
+        self,
+        name: str,
+        description: str,
+        dataset_path: Path,
+        annotation_schema: dict[str, Any],
     ) -> AnnotationProject:
         """Initialize or load project metadata"""
         if self.project_path.exists():
@@ -105,24 +108,24 @@ class AnnotationSystem:
                 name=name,
                 description=description,
                 dataset_path=dataset_path,
-                schema=schema,
+                annotation_schema=annotation_schema,
             )
             self._save_project(project)
             return project
 
-    def _save_project(self, project: AnnotationProject):
+    def _save_project(self, project: AnnotationProject) -> None:
         """Save project metadata to disk"""
         with open(self.project_path, "w") as f:
-            yaml.dump(json.loads(project.json()), f)
+            yaml.dump(project.model_dump(), f)
 
     def add_annotator(
         self,
         annotator_id: str,
         name: str,
-        role: Optional[str] = None,
-        expertise_level: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
-    ):
+        role: str | None = None,
+        expertise_level: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Register a new annotator"""
         annotator = Annotator(
             annotator_id=annotator_id,
@@ -232,8 +235,12 @@ class AnnotationSystem:
                     ann
                     for ann in trajectory_annotations.annotations
                     if ann.span
-                    and ann.span.start_time >= start_time
-                    and (not end_time or ann.span.end_time <= end_time)
+                    and (not start_time or ann.span.start_time >= start_time)
+                    and (
+                        not end_time
+                        or not ann.span.end_time
+                        or ann.span.end_time <= end_time
+                    )
                 ]
 
                 if time_anns:
@@ -241,66 +248,3 @@ class AnnotationSystem:
                     annotations[key] = time_anns
 
         return annotations
-
-
-# Example usage
-def example_annotation_system():
-    # Initialize annotation system
-    annotation_system = AnnotationSystem(
-        base_path=Path("./data/annotations"),
-        dataset_path=Path("./data/robot_dataset"),
-        project_name="Robot Behavior Analysis",
-        description="Annotating robot behaviors and interactions",
-        schema={
-            "behavior_type": ["cooperative", "competitive", "neutral"],
-            "success_rating": {"type": "float", "min": 0, "max": 1},
-            "comments": "string",
-        },
-    )
-
-    # Add annotators
-    annotation_system.add_annotator(
-        annotator_id="expert1",
-        name="Dr. Smith",
-        role="robotics_expert",
-        expertise_level="expert",
-    )
-
-    annotation_system.add_annotator(
-        annotator_id="expert2",
-        name="Dr. Jones",
-        role="hri_researcher",
-        expertise_level="expert",
-    )
-
-    # Add annotations
-    instance_id = "instance_001"
-    agent_id = "robot_1"
-
-    # Expert 1's annotation
-    annotation_system.add_annotation(
-        instance_id=instance_id,
-        agent_id=agent_id,
-        annotator_id="expert1",
-        content={
-            "behavior_type": "cooperative",
-            "success_rating": 0.85,
-            "comments": "Robot showed good adaptation to human partner",
-        },
-        span=AnnotationSpan(start_time=datetime.now(), end_time=datetime.now()),
-        confidence=0.9,
-    )
-
-    # Expert 2's annotation
-    annotation_system.add_annotation(
-        instance_id=instance_id,
-        agent_id=agent_id,
-        annotator_id="expert2",
-        content={
-            "behavior_type": "cooperative",
-            "success_rating": 0.78,
-            "comments": "Good cooperation but some delays in responses",
-        },
-        span=AnnotationSpan(start_time=datetime.now(), end_time=datetime.now()),
-        confidence=0.85,
-    )

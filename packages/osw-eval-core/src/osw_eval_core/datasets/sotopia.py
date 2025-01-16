@@ -2,7 +2,7 @@ import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from ..data import MultiAgentDataset, AgentMetadata, MediaType, PointType
+from osw_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from .base import BaseConverter, run_converter
 
 from huggingface_hub import hf_hub_download  # type:ignore[import-untyped]

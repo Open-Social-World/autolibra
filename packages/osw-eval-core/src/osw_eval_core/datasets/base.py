@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+from typing import Any
 
 
 class BaseConverter(object):
@@ -24,8 +25,13 @@ class BaseConverter(object):
 
 
 def run_converter(
-    converter_class: type[BaseConverter], output_path: Path, source_path: Path
+    converter_class: type[BaseConverter],
+    output_path: Path,
+    source_path: Path,
+    **kwargs: Any,
 ) -> None:
-    converter = converter_class(output_path=output_path, source_path=source_path)
+    converter = converter_class(
+        output_path=output_path, source_path=source_path, **kwargs
+    )
     converter.download_data()
     converter.convert_to_dataset()

@@ -8,9 +8,9 @@ from rich.markdown import Markdown
 from rich.table import Table
 import json
 
-from osw_eval_core.data.annotation import AnnotationSystem, AnnotationSpan
-from osw_eval_core.data.dataset import MultiAgentDataset
-from osw_eval_core.data.trajectory import PointType, MediaType
+from osw_data.annotation import AnnotationSystem, AnnotationSpan
+from osw_data.dataset import MultiAgentDataset
+from osw_data.trajectory import PointType, MediaType
 
 console = Console()
 app = typer.Typer()
@@ -30,7 +30,7 @@ class TTYAnnotator:
             dataset_path=dataset_path,
             project_name="Trajectory Annotation Project",
             description="Free-form text annotations of agent trajectories",
-            schema={
+            annotation_schema={
                 "feedback": {
                     "type": "string",
                     "description": "Free-form text feedback on the trajectory",
@@ -53,7 +53,7 @@ class TTYAnnotator:
         import termios
         import tty
 
-        def get_key():
+        def get_key() -> str | bool:
             """Get a single keypress from stdin"""
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
@@ -68,7 +68,7 @@ class TTYAnnotator:
         valid_agents = list(instance.agents.keys())
         current_idx = 0
 
-        def render_menu():
+        def render_menu() -> None:
             """Render the agent selection menu"""
             console.clear()
             console.print(
@@ -170,7 +170,7 @@ class TTYAnnotator:
 
         return "\n".join(formatted_lines)
 
-    def _display_observation(self, data: Any, media_type: MediaType):
+    def _display_observation(self, data: Any, media_type: MediaType) -> None:
         """Display an observation based on its media type"""
         if media_type == MediaType.JSON:
             # Handle HTML-like accessibility tree specially
@@ -209,7 +209,7 @@ class TTYAnnotator:
         else:
             console.print(f"[Unsupported media type: {media_type}]")
 
-    def _display_action(self, data: Any):
+    def _display_action(self, data: Any) -> None:
         """Display an action"""
         if isinstance(data, dict):
             # Pretty print action data
@@ -221,7 +221,7 @@ class TTYAnnotator:
         else:
             console.print(Panel(str(data), title="Action"))
 
-    def annotate_instance(self, instance_id: str):
+    def annotate_instance(self, instance_id: str) -> bool:
         """Annotate a specific instance"""
         console.clear()
 
@@ -300,8 +300,9 @@ class TTYAnnotator:
         )
 
         console.print("\n[bold green]Annotation saved![/bold green]")
+        return True
 
-    def run(self):
+    def run(self) -> None:
         """Run the annotation interface"""
         console.clear()
         console.print("[bold]TTY Annotation Interface[/bold]\n")
@@ -403,7 +404,7 @@ def main(
     dataset_path: Path = typer.Argument(..., help="Path to dataset directory"),
     annotation_path: Path = typer.Argument(..., help="Path to store annotations"),
     annotator_id: str = typer.Option(..., help="Unique identifier for the annotator"),
-):
+) -> None:
     """Run the TTY annotation interface"""
     try:
         annotator = TTYAnnotator(

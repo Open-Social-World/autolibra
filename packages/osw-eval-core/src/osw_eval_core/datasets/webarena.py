@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 # Import our dataset classes
-from ..data.dataset import MultiAgentDataset, AgentMetadata, MediaType, PointType
+from osw_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
 
 from .base import BaseConverter, run_converter
 
@@ -21,7 +21,7 @@ class WebArenaConverter(BaseConverter):
         super().__init__(output_path, source_path)
         self.screenshots_path = self.source_path / "screenshots"
 
-    def _setup_constants(self):
+    def _setup_constants(self) -> None:
         """Setup WebArena-specific constants"""
         self.SPECIAL_KEYS = [
             "Enter",
@@ -49,7 +49,7 @@ class WebArenaConverter(BaseConverter):
             + ["\n"]
         )
 
-    def download_data(self):
+    def download_data(self) -> None:
         """Download WebArena dataset files"""
         self.source_path.mkdir(parents=True, exist_ok=True)
 
