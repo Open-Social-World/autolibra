@@ -15,13 +15,16 @@ uv run python -m osw_eval_core.datasets.<dataset>
 #### Download from huggingface
 
 ```bash
-huggingface-cli download --repo-type dataset open-social-world/osw-eval --local-dir .data
+git clone https://huggingface.co/datasets/open-social-world/osw-eval .data
 ```
 
 #### Upload your data to huggingface
 
 ```bash
-huggingface-cli upload-large-folder --repo-type dataset open-social-world/osw-eval .data
+# cd into .data
+# git add your data
+# git commit -m "Add <dataset>"
+git push
 ```
 
 ### Annotation
