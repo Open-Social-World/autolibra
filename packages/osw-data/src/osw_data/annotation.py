@@ -1,3 +1,4 @@
+import json
 from pydantic import BaseModel, Field
 from typing import Optional, Any
 from pathlib import Path
@@ -116,7 +117,7 @@ class AnnotationSystem:
     def _save_project(self, project: AnnotationProject) -> None:
         """Save project metadata to disk"""
         with open(self.project_path, "w") as f:
-            yaml.dump(project.model_dump(), f)
+            yaml.dump(json.loads(project.model_dump_json()), f)
 
     def add_annotator(
         self,
