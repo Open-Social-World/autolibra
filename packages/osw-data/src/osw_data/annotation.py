@@ -204,7 +204,7 @@ class AnnotationSystem:
         annotations = {}
         for annotation_file in self.annotations_path.glob("*.json"):
             with open(annotation_file, "r") as f:
-                trajectory_annotations = TrajectoryAnnotations.mdoel_validate_json(
+                trajectory_annotations = TrajectoryAnnotations.model_validate_json(
                     f.read()
                 )
 
@@ -228,7 +228,7 @@ class AnnotationSystem:
         annotations = {}
         for annotation_file in self.annotations_path.glob("*.json"):
             with open(annotation_file, "r") as f:
-                trajectory_annotations = TrajectoryAnnotations.mdoel_validate_json(
+                trajectory_annotations = TrajectoryAnnotations.model_validate_json(
                     f.read()
                 )
 
