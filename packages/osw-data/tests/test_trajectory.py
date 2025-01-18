@@ -12,7 +12,7 @@ import numpy as np
 
 def test_mixed_trajectory() -> None:
     trajectory = SymmetricTrajectory(
-        trajectory_id="robot_1", storage_path=Path("./data/trajectories")
+        trajectory_id="robot_1", storage_path=Path("/tmp/data/trajectories")
     )
 
     # Add an observation with image data
