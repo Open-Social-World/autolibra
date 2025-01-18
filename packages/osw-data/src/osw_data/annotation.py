@@ -24,9 +24,6 @@ class AnnotationSpan(BaseModel):
     end_time: Optional[datetime] = None
     point_indices: Optional[list[int]] = None
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class Annotation(BaseModel):
     """Single annotation entry"""
@@ -149,7 +146,7 @@ class AnnotationSystem:
         annotation_path = self._get_trajectory_annotation_path(instance_id, agent_id)
         if annotation_path.exists():
             with open(annotation_path, "r") as f:
-                return TrajectoryAnnotations.parse_raw(f.read())
+                return TrajectoryAnnotations.model_validate_json(f.read())
         return TrajectoryAnnotations(instance_id=instance_id, agent_id=agent_id)
 
     def add_annotation(
@@ -196,7 +193,7 @@ class AnnotationSystem:
         # Save to disk
         annotation_path = self._get_trajectory_annotation_path(instance_id, agent_id)
         with open(annotation_path, "w") as f:
-            f.write(trajectory_annotations.json())
+            f.write(trajectory_annotations.model_dump_json())
 
         return annotation.annotation_id
 
@@ -207,7 +204,9 @@ class AnnotationSystem:
         annotations = {}
         for annotation_file in self.annotations_path.glob("*.json"):
             with open(annotation_file, "r") as f:
-                trajectory_annotations = TrajectoryAnnotations.parse_raw(f.read())
+                trajectory_annotations = TrajectoryAnnotations.mdoel_validate_json(
+                    f.read()
+                )
 
                 # Filter annotations by annotator
                 annotator_anns = [
@@ -229,7 +228,9 @@ class AnnotationSystem:
         annotations = {}
         for annotation_file in self.annotations_path.glob("*.json"):
             with open(annotation_file, "r") as f:
-                trajectory_annotations = TrajectoryAnnotations.parse_raw(f.read())
+                trajectory_annotations = TrajectoryAnnotations.mdoel_validate_json(
+                    f.read()
+                )
 
                 # Filter annotations by time
                 time_anns = [

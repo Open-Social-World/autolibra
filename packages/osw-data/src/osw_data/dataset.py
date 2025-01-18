@@ -33,9 +33,6 @@ class DataInstance(BaseModel):
     agents: dict[str, AgentMetadata]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class DatasetMetadata(BaseModel):
     """Metadata for the entire dataset"""

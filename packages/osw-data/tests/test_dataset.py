@@ -5,10 +5,12 @@ from pathlib import Path
 
 
 def test_dataset() -> None:
+    Path("/tmp/data/robot_dataset").mkdir(parents=True, exist_ok=True)
+
     # Create a new dataset
     dataset = MultiAgentDataset(
         name="Robot Interaction Dataset",
-        base_path=Path("./data/robot_dataset"),
+        base_path=Path("/tmp/data/robot_dataset"),
         description="Multi-agent robot interaction scenarios",
         version="1.0",
     )

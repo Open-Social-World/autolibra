@@ -1,5 +1,5 @@
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Any, Optional, Union
 from typing_extensions import Self
@@ -78,6 +78,7 @@ class MediaStorage:
         """Store media data in HDF5"""
         data_path = f"{trajectory_id}/{point_type}/{timestamp}/{uuid4()}.npy"
 
+        Path(self.base_path / data_path).parent.mkdir(parents=True, exist_ok=True)
         np.save(self.base_path / data_path, data)
 
         return MediaReference(
@@ -130,14 +131,13 @@ class TrajectoryPoint(BaseModel):
     Single point in a trajectory that can be either observation or action
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     timestamp: datetime
     agent_id: str
     point_type: PointType
     data_reference: MediaReference
     metadata: dict[str, Any] = Field(default_factory=dict)
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class SymmetricTrajectory:
