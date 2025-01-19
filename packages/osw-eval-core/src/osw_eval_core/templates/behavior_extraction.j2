@@ -1,7 +1,7 @@
 You are an expert evaluator tasked with analyzing agent trajectories and human feedback to identify and define relevant evaluation metrics.
 
 Context:
-Review the following interactions between an AI agent and a human, along with the corresponding human feedback for each interaction.
+Review the following trajectory of an AI agent, along with the corresponding human feedback for each interaction.
 
 {% for instance in instances %}
 Instance {{ loop.index }}:
@@ -15,31 +15,15 @@ Human Feedback:
 {% endfor %}
 
 Instructions:
-1. Analyze the agent trajectories and corresponding human feedback carefully
+1. Analyze the agent trajectories and human feedback carefully
 2. Identify key aspects of performance that emerge from the interactions and feedback
-3. Define a comprehensive set of metrics that capture these aspects
-4. For each metric provide:
-   - A clear name
-   - A detailed description of what the metric measures
-   - Why this metric is important based on the observed interactions
-   - Example behaviors from the trajectories that would score high or low on this metric
+3. Break down these aspects into specific agent behaviors and corresponding human feedback
+4. The behavior should be a specific action, a series of actions or decision made by the agent
+5. The feedback should be a summarization of the corresponding human feedback
+6. Please avoid any repetitive or redundant behaviors and feedback
 
 Output the following:
 
-Identified Metrics:
-[List each metric in the following format]
+It should be list of behavior and feedback, each in the following format:
 
-1. Metric Name: [Concise, descriptive name]
-   Description: [Clear explanation of what this metric measures]
-   Importance: [Why this metric matters based on the trajectories and feedback]
-   Examples:
-   - High Score Example: [Behavior that would exemplify high performance]
-   - Low Score Example: [Behavior that would indicate poor performance]
-
-2. [Continue for each identified metric...]
-
-Justification:
-[Explain how these metrics together provide comprehensive coverage of the important aspects of performance demonstrated in the trajectories and highlighted by the human feedback]
-
-Additional Considerations:
-[Note any context-specific factors that might affect metric applicability or interpretation]
+{'properties': {'instance_id': {'description': 'The ID of the instance the behavior was observed in', 'title': 'Instance Id', 'type': 'string'}, 'start_step': {'description': 'The step in the trajectory where the behavior started', 'title': 'Start Step', 'type': 'integer'}, 'end_step': {'description': 'The step in the trajectory where the behavior ended', 'title': 'End Step', 'type': 'integer'}, 'behavior': {'description': 'The behavior observed in the trajectory', 'title': 'Behavior', 'type': 'string'}, 'feedback': {'description': 'Summary of human comments on the behavior observed', 'title': 'Feedback', 'type': 'string'}}, 'required': ['instance_id', 'start_step', 'end_step', 'behavior', 'feedback'], 'title': 'BehaviorFeedback', 'type': 'object'}

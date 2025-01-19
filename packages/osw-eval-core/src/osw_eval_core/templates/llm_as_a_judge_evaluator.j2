@@ -1,0 +1,35 @@
+You are an expert evaluator tasked with analyzing agent trajectories and human feedback to identify and define relevant evaluation metrics.
+
+Context:
+Review the following task metadata, agent metadata, and its trajectory, and a metric that you should use to evaluate the agent's performance.
+
+Task Metadata:
+{{ instance.task_metadata }}
+
+Agent Metadata:
+{{ instance.agent_metadata }}
+
+Agent Trajectory:
+{{ instance.trajectory }}
+
+Metric:
+{{ instance.metric }}
+
+
+Instructions:
+1. Analyze the agent task and trajectory carefully
+2. Understand the metric provided, and figure out which part of the trajectory it might be relevant to
+3. Output two things:
+   - A reasoning for why you think the agent either did well or poorly on the metric
+      - If you think the agent did well, provide the behavior of the agent that led you to that conclusion
+      - If you think the agent did poorly, provide the behavior of the agent that led you to that conclusion
+   - A binary integer indicating whether you think the agent did well or poorly on the metric
+      - 1 indicates the agent did well or the metric is not applicable to the agent
+      - 0 indicates the agent did poorly
+
+Output the following:
+
+
+It should be a string (the reasoning) and an integer (the binary rating) in a json format:
+
+{'properties': {'reasoning': {'title': 'Reasoning', 'type': 'string'}, 'rating': {'title': 'Rating', 'type': 'integer'}}, 'required': ['reasoning', 'rating'], 'title': 'EvaluationResult', 'type': 'object'}

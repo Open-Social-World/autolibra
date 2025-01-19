@@ -1,6 +1,7 @@
 from .dataset import MultiAgentDataset, AgentMetadata, DataInstance
 from .trajectory import SymmetricTrajectory, TrajectoryPoint, MediaType, PointType
 from .annotation import Annotation, AnnotationSpan, Annotator, AnnotationSystem
+from .metrics import Metric, MetricSetMetadata, MetricSet
 
 __all__ = [
     "DataInstance",
@@ -14,4 +15,7 @@ __all__ = [
     "AgentMetadata",
     "MediaType",
     "PointType",
+    "Metric",
+    "MetricSetMetadata",
+    "MetricSet",
 ]

@@ -1,6 +1,8 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from pydantic import BaseModel
+from osw_data.dataset import DataInstance
+from osw_data.metrics import Metric
 from pydantic_ai import Agent
 from pydantic_ai.models.vertexai import VertexAIModel
 from importlib import resources
@@ -17,27 +19,24 @@ def load_template() -> jinja2.Template:
         return jinja2.Template(f.read())
 
 
-def render_webarena_trajectory(trajectory: SymmetricTrajectory) -> str:
+def render_webarena_trajectory(
+    trajectory: SymmetricTrajectory, metadata: DataInstance | None = None
+) -> str:
     return "\n".join(
         [
+            metadata.model_dump_json(),
+        ]
+        if metadata
+        else []
+        + [
             f"{'Observation' if p.point_type == 'observation' else 'Action'}: {trajectory.get_data_at(i)}"
             for i, p in enumerate(trajectory.points)
         ]
     )
 
 
-class Metric(BaseModel):
-    name: str
-    explanation: str
-    good_behavior: list[str]
-    bad_behavior: list[str]
-
-
-if __name__ == "__main__":
+def get_metrics(dataset_path: Path, annotation_path: Path) -> list[Metric]:
     template = load_template()
-
-    dataset_path = Path(".data/cogym")
-    annotation_path = Path(".data/annotations/cogym")
 
     dataset = MultiAgentDataset(
         name="dataset",  # This will be loaded from metadata
@@ -61,7 +60,6 @@ if __name__ == "__main__":
 
     for instance_id in dataset.list_instances():
         instance = dataset.get_instance_metadata(instance_id)
-        any_agent_unannotated = False
 
         # Check each agent for unannotated trajectories
         for agent_id in instance.agents:
@@ -73,17 +71,28 @@ if __name__ == "__main__":
                 instances.append(
                     dict(
                         trajectory=render_webarena_trajectory(
-                            dataset.get_trajectory(instance_id, agent_id)
+                            metadata=instance,
+                            trajectory=dataset.get_trajectory(instance_id, agent_id),
                         ),
                         feedback=annotation.content,
                     )
                 )
 
     # Generate the metrics
-    prompt = template.render(instances=instances[:50])
+    prompt = template.render(instances=instances)
 
     model = VertexAIModel("gemini-2.0-flash-exp")
     agent = Agent(model, result_type=list[Metric])
 
     result = agent.run_sync(prompt)
-    print(result.data)
+    return result.data
+
+
+if __name__ == "__main__":
+    result = get_metrics(Path(".data/sotopia"), Path(".data/annotations/sotopia"))
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    # Save the metrics to a file
+    with open(f".data/metrics/metrics-{timestamp}.jsonl", "w") as f:
+        for metric in result:
+            f.write(metric.model_dump_json() + "\n")
