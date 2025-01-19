@@ -1,0 +1,28 @@
+You are an expert in thematic anaysis trying to understand the differences between quantative and qualitative evaluation metrics.
+
+Context:
+Review the following task metadata, agent metadata, the huamn's free-form feedback, and the quantative metrics.
+
+Task Metadata:
+{{ instance.task_metadata }}
+
+Agent Metadata:
+{{ instance.agent_metadata }}
+
+Humans' feedback:
+{{ instance.feedback }}
+
+Quantative metrics and their corresponding ratings:
+{{ instance.metric }}
+
+
+Instructions:
+1. Analyze the task and humans' feedback carefully
+2. Break the humans' feedback into bullet points.
+3. Understand the metrics provided. And think about what part of the feedback is not captured by the metrics.
+4. For each bulletpoint, provide which metric you think covers it, or if it is not covered by any metric.
+5. After that, please rate the coverage of the metrics on the feedback from 0 to 5, where 0 means the metrics do not cover the feedback at all, and 5 means the metrics cover the feedback perfectly.
+
+Output the following:
+
+It should be a string (the reasoning) and an integer (the 0-5 rating) in a json format
