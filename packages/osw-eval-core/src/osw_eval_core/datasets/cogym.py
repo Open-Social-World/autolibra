@@ -64,7 +64,6 @@ class CoGymConverter(BaseConverter):
         if self.annotation_path is not None:
             annotation_system = AnnotationSystem(
                 base_path=self.annotation_path,
-                dataset_path=self.output_path,
                 project_name="CoGym Annotations",
                 annotation_schema={
                     "feedback": {

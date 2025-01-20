@@ -7,7 +7,6 @@ def test_annotation_system() -> None:
     # Initialize annotation system
     annotation_system = AnnotationSystem(
         base_path=Path("/tmp/data/annotations"),
-        dataset_path=Path("/tmp/data/robot_dataset"),
         project_name="Robot Behavior Analysis",
         description="Annotating robot behaviors and interactions",
         annotation_schema={
