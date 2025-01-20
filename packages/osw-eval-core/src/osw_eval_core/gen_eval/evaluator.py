@@ -110,7 +110,6 @@ def evaluate_dataset_with_metrics(
 
     annotation_system = AnnotationSystem(
         base_path=annotation_path,
-        dataset_path=dataset_path,
         project_name="Trajectory Annotation Project",
         description="Free-form text annotations of agent trajectories",
         annotation_schema={

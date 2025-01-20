@@ -53,7 +53,6 @@ class AnnotationProject(BaseModel):
     project_id: str
     name: str
     description: str
-    dataset_path: Path
     annotation_schema: dict[str, Any]  # Defines the expected annotation structure
     guidelines: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
@@ -70,7 +69,6 @@ class AnnotationSystem:
     def __init__(
         self,
         base_path: Path,
-        dataset_path: Path,
         project_name: str,
         description: str = "",
         annotation_schema: Optional[dict[str, Any]] = None,
@@ -85,14 +83,13 @@ class AnnotationSystem:
 
         # Initialize or load project metadata
         self.project = self._init_project(
-            project_name, description, dataset_path, annotation_schema or {}
+            project_name, description, annotation_schema or {}
         )
 
     def _init_project(
         self,
         name: str,
         description: str,
-        dataset_path: Path,
         annotation_schema: dict[str, Any],
     ) -> AnnotationProject:
         """Initialize or load project metadata"""
@@ -105,7 +102,6 @@ class AnnotationSystem:
                 project_id=str(uuid4()),
                 name=name,
                 description=description,
-                dataset_path=dataset_path,
                 annotation_schema=annotation_schema,
             )
             self._save_project(project)
