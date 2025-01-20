@@ -1,4 +1,3 @@
-from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Any, Optional, Union
@@ -46,6 +45,8 @@ class MediaStorage:
         self.base_path.mkdir(parents=True, exist_ok=True)
         self._json_path = self.base_path / "json_data"
         self._json_path.mkdir(exist_ok=True)
+        self._numpy_path = self.base_path / "numpy_data"
+        self._numpy_path.mkdir(exist_ok=True)
 
     def store_data(
         self,
@@ -76,14 +77,13 @@ class MediaStorage:
         point_type: PointType,
     ) -> MediaReference:
         """Store media data in HDF5"""
-        data_path = f"{trajectory_id}/{point_type}/{timestamp}/{uuid4()}.npy"
+        data_path = self._numpy_path / f"{trajectory_id}_{point_type}_{timestamp}.npy"
 
-        Path(self.base_path / data_path).parent.mkdir(parents=True, exist_ok=True)
-        np.save(self.base_path / data_path, data)
+        np.save(data_path, data)
 
         return MediaReference(
             media_type=media_type,
-            file_path=self.base_path / data_path,
+            file_path=data_path.relative_to(self.base_path),
             shape=data.shape,
             dtype=str(data.dtype),
         )
@@ -103,7 +103,7 @@ class MediaStorage:
 
         return MediaReference(
             media_type=MediaType.JSON,
-            file_path=json_file,
+            file_path=json_file.relative_to(self.base_path),
             metadata={"timestamp": timestamp},
         )
 
@@ -112,12 +112,12 @@ class MediaStorage:
     ) -> npt.NDArray[Any] | dict[str, Any] | str:
         """Load either media or JSON data from reference"""
         if reference.media_type == MediaType.JSON:
-            with open(reference.file_path, "r") as f:
+            with open(self.base_path / reference.file_path, "r") as f:
                 json_data = json.load(f)
                 assert isinstance(json_data, (dict, str)), "Invalid JSON data"
                 return json_data
         else:
-            data_path = reference.file_path
+            data_path = self.base_path / reference.file_path
             data = np.load(data_path)
             assert isinstance(data, np.ndarray), "Invalid NumPy data"
             return data

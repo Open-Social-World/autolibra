@@ -45,7 +45,6 @@ def get_metrics(dataset_path: Path, annotation_path: Path) -> list[Metric]:
 
     annotation_system = AnnotationSystem(
         base_path=annotation_path,
-        dataset_path=dataset_path,
         project_name="Trajectory Annotation Project",
         description="Free-form text annotations of agent trajectories",
         annotation_schema={
