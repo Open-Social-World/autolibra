@@ -79,7 +79,7 @@ class TestMetricSetInitialization:
         )
 
         # Create existing metric file
-        metric_path = tmp_path / "metrics" / "metric1.yaml"
+        metric_path = tmp_path / "metrics" / "metric1.json"
         metric_path.parent.mkdir(parents=True, exist_ok=True)
         with open(metric_path, "w") as f:
             f.write(metric1.model_dump_json(indent=2))
@@ -114,7 +114,7 @@ class TestMetricOperations:
         assert metric_set.metrics[sample_metric.name] == sample_metric
 
         # Check if metric file was created
-        metric_path = metric_set.metrics_path / f"{sample_metric.name}.yaml"
+        metric_path = metric_set.metrics_path / f"{sample_metric.name}.json"
         assert metric_path.exists()
 
     def test_add_multiple_metrics(
@@ -125,7 +125,7 @@ class TestMetricOperations:
 
         for metric in sample_metrics:
             assert metric.name in metric_set.metrics
-            metric_path = metric_set.metrics_path / f"{metric.name}.yaml"
+            metric_path = metric_set.metrics_path / f"{metric.name}.json"
             assert metric_path.exists()
 
     def test_add_duplicate_metric(
@@ -162,7 +162,7 @@ class TestMetricOperations:
         metric_set.add_metrics([sample_metric])
 
         # Corrupt the metric file
-        metric_path = metric_set.metrics_path / f"{sample_metric.name}.yaml"
+        metric_path = metric_set.metrics_path / f"{sample_metric.name}.json"
         with open(metric_path, "w") as f:
             f.write("invalid json")
 
@@ -196,7 +196,7 @@ class TestMetadataOperations:
         metric_set._save_metrics()
 
         for metric in sample_metrics:
-            metric_path = metric_set.metrics_path / f"{metric.name}.yaml"
+            metric_path = metric_set.metrics_path / f"{metric.name}.json"
             assert metric_path.exists()
 
             with open(metric_path, "r") as f:

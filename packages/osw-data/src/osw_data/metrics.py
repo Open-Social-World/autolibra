@@ -65,13 +65,13 @@ class MetricSet:
         self,
     ) -> None:
         for name, metric in self.metrics.items():
-            metric_path = self.metrics_path / f"{name}.yaml"
+            metric_path = self.metrics_path / f"{name}.json"
             with open(metric_path, "w") as f:
                 f.write(metric.model_dump_json(indent=2))
 
     def load_metrics(self) -> None:
         for metric in self.metadata.metric_names:
-            metric_path = self.metrics_path / f"{metric}.yaml"
+            metric_path = self.metrics_path / f"{metric}.json"
             with open(metric_path, "r") as f:
                 self.metrics[metric] = Metric.model_validate_json(f.read())
 
@@ -80,7 +80,7 @@ class MetricSet:
             if metric.name in self.metrics:
                 raise ValueError(f"Metric with name {metric.name} already exists")
             self.metrics[metric.name] = metric
-            metric_path = self.metrics_path / f"{metric.name}.yaml"
+            metric_path = self.metrics_path / f"{metric.name}.json"
             with open(metric_path, "w") as f:
                 f.write(metric.model_dump_json(indent=2))
 
@@ -90,6 +90,6 @@ class MetricSet:
     def get_metric(self, name: str) -> Metric:
         if name not in self.metrics:
             raise ValueError(f"Metric with name {name} does not exist")
-        metric_path = self.metrics_path / f"{name}.yaml"
+        metric_path = self.metrics_path / f"{name}.json"
         with open(metric_path, "r") as f:
             return Metric.model_validate_json(f.read())

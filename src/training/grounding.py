@@ -47,7 +47,7 @@ async def main() -> None:
         *[feedback_grounding(instance) for instance in metric_training_instances]
     )
 
-    with open("feedback_grounding_results.txt", "w") as f:
+    with open("feedback_grounding_results.jsonl", "w") as f:
         for feedback_grounding_result in feedback_grounding_results:
             f.write(feedback_grounding_result.model_dump_json(indent=2))
             f.write("\n")
