@@ -12,17 +12,21 @@
 import asyncio
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
-from osw_eval_core import MetricTrainingInstance, feedback_grounding
+from osw_eval_core import (
+    MetricTrainingInstance,
+    feedback_grounding,
+    behavior_clustering,
+)
 
 
 async def main() -> None:
     dataset = MultiAgentDataset(
         name="dataset",
-        base_path=".data/webarena",
+        base_path=".data/cogym",
     )
 
     annotation_system = AnnotationSystem(
-        base_path=".data/annotations/webarena",
+        base_path=".data/annotations/cogym",
     )
 
     metric_training_instances: list[MetricTrainingInstance] = []
@@ -36,7 +40,9 @@ async def main() -> None:
             for annotation in trajectory_annotations.annotations:
                 metric_training_instances.append(
                     MetricTrainingInstance(
-                        task=instance.metadata["task"],
+                        task=instance.metadata["task"]
+                        if "task" in instance.metadata
+                        else "Task is described in the trajectory observation",
                         agent_id=agent_id,
                         trajectory=dataset.get_trajectory(instances, agent_id),
                         feedback=annotation.content["feedback"],
@@ -50,6 +56,13 @@ async def main() -> None:
     with open("feedback_grounding_results.jsonl", "w") as f:
         for feedback_grounding_result in feedback_grounding_results:
             f.write(feedback_grounding_result.model_dump_json(indent=2))
+            f.write("\n")
+
+    behavior_clustering_results = await behavior_clustering(feedback_grounding_results)
+
+    with open("behavior_clustering_results.jsonl", "w") as f:
+        for behavior_clustering_result in behavior_clustering_results.metrics:
+            f.write(behavior_clustering_result.model_dump_json(indent=2))
             f.write("\n")
 
 

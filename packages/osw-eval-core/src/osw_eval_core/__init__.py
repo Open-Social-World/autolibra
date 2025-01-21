@@ -3,6 +3,7 @@ from .gen_eval import (
     MetricTrainingInstance,
     llm_evaluation,
     feedback_grounding,
+    behavior_clustering,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "MetricTrainingInstance",
     "llm_evaluation",
     "feedback_grounding",
+    "behavior_clustering",
 ]

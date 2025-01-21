@@ -1,6 +1,7 @@
+import asyncio
 from importlib import resources
 import jinja2
-from openai import AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, RateLimitError
 from osw_eval_core.configs import OSWEvalSettings
 from pydantic import BaseModel
 from .generator import render_training_instance, MetricTrainingInstance
@@ -41,14 +42,25 @@ async def feedback_grounding(
         )
     )
 
-    completion = await client.beta.chat.completions.parse(
-        model="gpt-4o-241120",
-        messages=[
-            {"role": "system", "content": "Ground the feedback in the behavior."},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=FeedbackGroundingOutput,
-    )
+    wait_time = 1
+    while True:
+        try:
+            completion = await client.beta.chat.completions.parse(
+                model="gpt-4o-241120",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Ground the feedback in the behavior.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=FeedbackGroundingOutput,
+            )
+            break
+        except RateLimitError as e:
+            print(f"Rate limit error: {e}")
+            await asyncio.sleep(wait_time)
+            wait_time *= 2
 
     if not completion.choices[0].message.parsed:
         raise ValueError("Failed to parse the response.")
