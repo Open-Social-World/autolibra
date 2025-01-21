@@ -3,7 +3,6 @@ from typing import Any
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.markdown import Markdown
 from rich.table import Table
 import json
@@ -190,56 +189,60 @@ class TTYAnnotator:
             else:
                 # Pretty print other JSON data
                 json_str = json.dumps(data, indent=2)
-                
+
                 # Helper func to clean json strings
-                def clean_json_obs(json_str):
+                def clean_json_obs(json_str: str) -> str:
                     # Remove the outer curly brackets
-                    content = json_str.strip('{}')
-                    
+                    content = json_str.strip("{}")
+
                     # Remove the "content": part at the beginning
                     if '"content": ' in content:
                         content = content.split('"content": ', 1)[1]
-                    
+
                     # Remove the quotes at the start and end
                     content = content.strip('"')
-                    
+
                     # Replace escaped newlines with actual newlines
-                    content = content.replace('\\n', '\n')
-                    
+                    content = content.replace("\\n", "\n")
+
                     # Replace escaped quotes with regular quotes
                     content = content.replace("\\'", "'")
-                    
+
                     # Add Rich formatting to labels (text between newline and colon)
                     formatted_lines = []
-                    for line in content.split('\n'):
+                    for line in content.split("\n"):
                         # Skip empty lines and standalone quotes
-                        if line.strip() in ['', '"']:
+                        if line.strip() in ["", '"']:
                             continue
-                            
-                        if ':' in line:
+
+                        if ":" in line:
                             # Split at the first colon
-                            label, rest = line.split(':', 1)
+                            label, rest = line.split(":", 1)
                             # Format the label if it's not empty
                             if label.strip():
-                                formatted_line = f"[bold green]{label}[/bold green]:{rest}"
+                                formatted_line = (
+                                    f"[bold green]{label}[/bold green]:{rest}"
+                                )
                             else:
                                 formatted_line = line
                         else:
                             formatted_line = line
                         formatted_lines.append(formatted_line)
-                    
+
                     # Remove any trailing empty lines
                     while formatted_lines and not formatted_lines[-1].strip():
                         formatted_lines.pop()
-                    
-                    return '\n'.join(formatted_lines)         
+
+                    return "\n".join(formatted_lines)
 
                 cleaned_str = clean_json_obs(json_str)
                 # Get console width and adjust panel width
                 width = min(
                     console.width - 2, 120
                 )  # Max width of 120 or console width - 2
-                console.print(Panel(cleaned_str, title="Observation (JSON)", width=width))
+                console.print(
+                    Panel(cleaned_str, title="Observation (JSON)", width=width)
+                )
 
         elif media_type == MediaType.TEXT:
             # Display text data
@@ -257,23 +260,22 @@ class TTYAnnotator:
         if isinstance(data, dict):
             # Pretty print action data
             json_str = json.dumps(data, indent=2)
-            
-            # Helper func to clean json strings
-            def clean_json_action(json_str):
+
+            def clean_json_action(json_str: str) -> str:
                 # Remove the outer curly brackets
-                content = json_str.strip('{}')
+                content = json_str.strip("{}")
                 # Remove the "content": part at the beginning
                 if '"content": ' in content:
                     content = content.split('"content": ', 1)[1]
                 # Remove the quotes at the start and end
                 content = content.strip('"')
                 # Replace escaped newlines with actual newlines
-                content = content.replace('\\n', '\n\n')
+                content = content.replace("\\n", "\n\n")
                 # Replace escaped quotes with regular quotes
                 content = content.replace("\\'", "'")
-                
+
                 return content
-            
+
             cleaned_json_str = clean_json_action(json_str)
             # Get console width and adjust panel width
             width = min(console.width - 2, 120)  # Max width of 120 or console width - 2
