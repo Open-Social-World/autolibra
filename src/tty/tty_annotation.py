@@ -190,12 +190,29 @@ class TTYAnnotator:
             else:
                 # Pretty print other JSON data
                 json_str = json.dumps(data, indent=2)
-                syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
+                
+                # Helper func to clean json strings
+                def clean_json_string(json_str):
+                    # Remove the outer curly brackets
+                    content = json_str.strip('{}')
+                    # Remove the "content": part at the beginning
+                    if '"content": ' in content:
+                        content = content.split('"content": ', 1)[1]
+                    # Remove the quotes at the start and end
+                    content = content.strip('"')
+                    # Replace escaped newlines with actual newlines
+                    content = content.replace('\\n', '\n\n')
+                    # Replace escaped quotes with regular quotes
+                    content = content.replace("\\'", "'")
+                    
+                    return content
+                
+                cleaned_str = clean_json_string(json_str)
                 # Get console width and adjust panel width
                 width = min(
                     console.width - 2, 120
                 )  # Max width of 120 or console width - 2
-                console.print(Panel(syntax, title="Observation (JSON)", width=width))
+                console.print(Panel(cleaned_str, title="Observation (JSON)", width=width))
 
         elif media_type == MediaType.TEXT:
             # Display text data
