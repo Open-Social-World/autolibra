@@ -12,10 +12,10 @@ class MetricSetMetadata(BaseModel):
 
 
 class Metric(BaseModel):
-    name: str
-    explanation: str
     good_behaviors: list[str] = Field(default_factory=list)
     bad_behaviors: list[str] = Field(default_factory=list)
+    explanation: str
+    name: str
 
 
 class MetricSet:
@@ -32,7 +32,7 @@ class MetricSet:
     ):
         self.base_path = Path(base_path)
         self.metrics_path = self.base_path / "metrics"
-        self.metadata_path = self.base_path / "metadata.yaml"
+        self.metadata_path = self.base_path / "metadata.json"
 
         # Initialize directory structure
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,7 @@ class MetricSet:
 
         # Initialize or load dataset metadata
         self.metadata = self._init_metadata(name, induced_from, version)
+        self.load_metrics()
 
     def _init_metadata(
         self, name: str, induced_from: str, version: str | None
@@ -68,6 +69,12 @@ class MetricSet:
             with open(metric_path, "w") as f:
                 f.write(metric.model_dump_json(indent=2))
 
+    def load_metrics(self) -> None:
+        for metric in self.metadata.metric_names:
+            metric_path = self.metrics_path / f"{metric}.yaml"
+            with open(metric_path, "r") as f:
+                self.metrics[metric] = Metric.model_validate_json(f.read())
+
     def add_metrics(self, metrics: list[Metric]) -> None:
         for metric in metrics:
             if metric.name in self.metrics:
@@ -76,6 +83,9 @@ class MetricSet:
             metric_path = self.metrics_path / f"{metric.name}.yaml"
             with open(metric_path, "w") as f:
                 f.write(metric.model_dump_json(indent=2))
+
+        self.metadata.metric_names = list(self.metrics.keys())
+        self._save_metadata(self.metadata)
 
     def get_metric(self, name: str) -> Metric:
         if name not in self.metrics:

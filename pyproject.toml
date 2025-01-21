@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.6",
     "osw-eval-core[webarena,sotopia]",
+    "pydantic-settings>=2.7.1",
     "rich>=13.9.4",
     "typer>=0.15.1",
     "uvicorn>=0.34.0",
@@ -19,6 +20,11 @@ dev-dependencies = [
     "pre-commit>=4.0.1",
     "pytest-cov>=6.0.0",
     "pytest>=8.3.4",
+]
+
+[project.optional-dependencies]
+notebook = [
+    "marimo>=0.10"
 ]
 
 [tool.uv.sources]

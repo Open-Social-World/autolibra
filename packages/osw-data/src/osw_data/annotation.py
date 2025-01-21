@@ -68,8 +68,8 @@ class AnnotationSystem:
 
     def __init__(
         self,
-        base_path: Path,
-        project_name: str,
+        base_path: Path | str,
+        project_name: str | None = None,
         description: str = "",
         annotation_schema: Optional[dict[str, Any]] = None,
     ):
@@ -88,7 +88,7 @@ class AnnotationSystem:
 
     def _init_project(
         self,
-        name: str,
+        name: str | None,
         description: str,
         annotation_schema: dict[str, Any],
     ) -> AnnotationProject:
@@ -98,6 +98,8 @@ class AnnotationSystem:
                 project_dict = yaml.safe_load(f)
                 return AnnotationProject(**project_dict)
         else:
+            if not name:
+                raise ValueError("Project name is required")
             project = AnnotationProject(
                 project_id=str(uuid4()),
                 name=name,
