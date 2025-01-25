@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241103_Claude-3.5-Sonnet,MiniHack-Corridor-R3-v0,MiniHack-Corridor-R3-v0_run_02.json,0.09800000000000007,100,True,1599245077,"{""north"": 1, ""east"": 50, ""southeast"": 2, ""south"": 2, ""west"": 44, ""northwest"": 1}",0.0

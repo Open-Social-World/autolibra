@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-mistral-nemo-instruct,MiniHack-CorridorBattle-Dark-v0,MiniHack-CorridorBattle-Dark-v0_run_01.json,-0.26000000000000006,79,True,1528151922,"{""north"": 10, ""east"": 13, ""northeast"": 3, ""south"": 32, ""west"": 21}",0.0

@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241101_naive-Llama-3.1-8B-Instruct,MiniHack-Quest-Medium-v0,MiniHack-Quest-Medium-v0_run_01.json,0.028000000000000018,100,True,1402298757,"{""north"": 26, ""zap"": 13, ""east"": 24, ""pickup"": 14, ""southwest"": 2, ""northwest"": 3, ""down"": 1, ""south"": 9, ""search"": 1, ""wait"": 2, ""kick"": 5}",0.0

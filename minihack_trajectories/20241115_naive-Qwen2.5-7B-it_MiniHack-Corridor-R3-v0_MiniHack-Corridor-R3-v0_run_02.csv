@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241115_naive-Qwen2.5-7B-it,MiniHack-Corridor-R3-v0,MiniHack-Corridor-R3-v0_run_02.json,-0.19000000000000003,100,True,735364818,"{""north"": 19, ""east"": 2, ""west"": 5, ""south"": 5, ""search"": 63, ""open"": 1, ""northeast"": 1, ""northwest"": 4}",0.0

@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-mistral-nemo-instruct,MiniHack-Boxoban-Hard-v0,MiniHack-Boxoban-Hard-v0_run_02.json,-0.09900000000000009,100,True,953589524,"{""north"": 39, ""south"": 31, ""west"": 25, ""east"": 5}",0.0

@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241101_naive-Llama-3.1-8B-Instruct,MiniHack-Boxoban-Medium-v0,MiniHack-Boxoban-Medium-v0_run_00.json,-0.09900000000000007,100,True,3856332221,"{""east"": 45, ""west"": 4, ""north"": 26, ""south"": 25}",0.0

@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-mistral-nemo-instruct,MiniHack-MazeWalk-15x15-v0,MiniHack-MazeWalk-15x15-v0_run_00.json,-0.8900000000000006,100,True,2649528333,"{""north"": 72, ""northeast"": 15, ""east"": 5, ""west"": 6, ""northwest"": 2}",0.0

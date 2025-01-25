@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-claude-3-5-haiku,MiniHack-Boxoban-Medium-v0,MiniHack-Boxoban-Medium-v0_run_00.json,-0.09900000000000007,100,True,1856107652,"{""north"": 12, ""west"": 35, ""south"": 28, ""east"": 25}",0.0

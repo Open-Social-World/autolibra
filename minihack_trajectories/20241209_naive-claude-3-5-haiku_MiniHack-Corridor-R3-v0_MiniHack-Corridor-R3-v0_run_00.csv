@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-claude-3-5-haiku,MiniHack-Corridor-R3-v0,MiniHack-Corridor-R3-v0_run_00.json,-0.9200000000000006,100,True,1214438202,"{""open"": 43, ""west"": 36, ""north"": 5, ""northwest"": 2, ""southwest"": 8, ""northeast"": 2, ""east"": 1, ""south"": 2, ""search"": 1}",0.0

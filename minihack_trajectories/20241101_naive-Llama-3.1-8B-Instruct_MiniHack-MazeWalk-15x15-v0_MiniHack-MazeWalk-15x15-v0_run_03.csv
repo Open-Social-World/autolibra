@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241101_naive-Llama-3.1-8B-Instruct,MiniHack-MazeWalk-15x15-v0,MiniHack-MazeWalk-15x15-v0_run_03.json,0.07300000000000005,100,True,2245051872,"{""north"": 29, ""east"": 33, ""west"": 33, ""south"": 5}",0.0

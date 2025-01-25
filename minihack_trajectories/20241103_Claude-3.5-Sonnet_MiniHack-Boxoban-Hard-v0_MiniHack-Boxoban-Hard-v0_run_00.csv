@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241103_Claude-3.5-Sonnet,MiniHack-Boxoban-Hard-v0,MiniHack-Boxoban-Hard-v0_run_00.json,-0.09900000000000009,100,True,1709544261,"{""north"": 31, ""east"": 19, ""west"": 21, ""south"": 29}",0.0

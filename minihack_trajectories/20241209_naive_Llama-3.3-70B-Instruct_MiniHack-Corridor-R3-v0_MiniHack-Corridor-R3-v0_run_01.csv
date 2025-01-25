@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive_Llama-3.3-70B-Instruct,MiniHack-Corridor-R3-v0,MiniHack-Corridor-R3-v0_run_01.json,-0.26000000000000006,100,True,225620043,"{""east"": 28, ""open"": 1, ""search"": 9, ""south"": 16, ""north"": 8, ""northwest"": 14, ""west"": 13, ""southwest"": 7, ""northeast"": 3, ""southeast"": 1}",0.0

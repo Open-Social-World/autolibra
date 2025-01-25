@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241103_Claude-3.5-Sonnet,MiniHack-MazeWalk-9x9-v0,MiniHack-MazeWalk-9x9-v0_run_01.json,1.0099999999999998,11,True,3939607354,"{""north"": 4, ""west"": 3, ""south"": 4}",1.0

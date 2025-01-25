@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241030_naive-Llama-3.2-3B-Instruct,MiniHack-CorridorBattle-Dark-v0,MiniHack-CorridorBattle-Dark-v0_run_00.json,0.027000000000000017,100,True,2094178188,"{""east"": 15, ""north"": 71, ""northeast"": 1, ""southwest"": 3, ""northwest"": 2, ""south"": 8}",0.0

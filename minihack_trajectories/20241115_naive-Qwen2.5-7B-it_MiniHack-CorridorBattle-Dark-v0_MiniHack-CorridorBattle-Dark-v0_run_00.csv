@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241115_naive-Qwen2.5-7B-it,MiniHack-CorridorBattle-Dark-v0,MiniHack-CorridorBattle-Dark-v0_run_00.json,-0.8400000000000005,100,True,387579986,"{""north"": 7, ""south"": 81, ""east"": 1, ""west"": 11}",0.0

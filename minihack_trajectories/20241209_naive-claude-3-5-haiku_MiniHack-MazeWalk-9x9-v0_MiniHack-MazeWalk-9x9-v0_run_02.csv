@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-claude-3-5-haiku,MiniHack-MazeWalk-9x9-v0,MiniHack-MazeWalk-9x9-v0_run_02.json,0.94,21,True,651669287,"{""north"": 8, ""east"": 2, ""southeast"": 1, ""south"": 7, ""southwest"": 1, ""west"": 2}",1.0

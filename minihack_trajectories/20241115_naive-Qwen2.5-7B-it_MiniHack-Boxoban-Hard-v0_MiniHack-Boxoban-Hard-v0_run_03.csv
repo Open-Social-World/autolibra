@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241115_naive-Qwen2.5-7B-it,MiniHack-Boxoban-Hard-v0,MiniHack-Boxoban-Hard-v0_run_03.json,-0.09900000000000007,100,True,2044490776,"{""east"": 5, ""south"": 90, ""west"": 5}",0.0

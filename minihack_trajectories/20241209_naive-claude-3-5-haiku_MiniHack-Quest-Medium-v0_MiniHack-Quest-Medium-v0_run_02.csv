@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-claude-3-5-haiku,MiniHack-Quest-Medium-v0,MiniHack-Quest-Medium-v0_run_02.json,-0.19000000000000003,61,True,493089661,"{""east"": 17, ""south"": 12, ""west"": 16, ""north"": 7, ""zap"": 1, ""kick"": 1, ""northeast"": 7}",0.0

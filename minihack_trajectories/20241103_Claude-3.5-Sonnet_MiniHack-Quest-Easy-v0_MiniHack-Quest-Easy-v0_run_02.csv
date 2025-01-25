@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241103_Claude-3.5-Sonnet,MiniHack-Quest-Easy-v0,MiniHack-Quest-Easy-v0_run_02.json,-0.001,7,True,3028958482,"{""north"": 1, ""east"": 3, ""kick"": 1, ""south"": 1, ""southeast"": 1}",0.0

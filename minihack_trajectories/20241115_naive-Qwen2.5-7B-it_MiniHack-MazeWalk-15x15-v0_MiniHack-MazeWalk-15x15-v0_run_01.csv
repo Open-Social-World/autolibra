@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241115_naive-Qwen2.5-7B-it,MiniHack-MazeWalk-15x15-v0,MiniHack-MazeWalk-15x15-v0_run_01.json,-0.23000000000000007,100,True,1289458167,"{""south"": 1, ""southwest"": 50, ""northeast"": 49}",0.0

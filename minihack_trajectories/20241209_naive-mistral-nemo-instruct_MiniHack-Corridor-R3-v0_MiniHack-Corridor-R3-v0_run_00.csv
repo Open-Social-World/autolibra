@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-mistral-nemo-instruct,MiniHack-Corridor-R3-v0,MiniHack-Corridor-R3-v0_run_00.json,-0.5400000000000003,100,True,5099532,"{""northeast"": 10, ""east"": 21, ""open"": 7, ""north"": 27, ""west"": 21, ""search"": 7, ""southeast"": 1, ""kick"": 4, ""northwest"": 2}",0.0

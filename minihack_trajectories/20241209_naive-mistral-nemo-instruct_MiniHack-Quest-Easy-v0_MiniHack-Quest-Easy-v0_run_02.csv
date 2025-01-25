@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-mistral-nemo-instruct,MiniHack-Quest-Easy-v0,MiniHack-Quest-Easy-v0_run_02.json,-0.5800000000000003,100,True,2667857721,"{""north"": 36, ""northeast"": 10, ""wait"": 14, ""search"": 4, ""south"": 13, ""kick"": 2, ""pray"": 2, ""more"": 1, ""west"": 5, ""east"": 4, ""close"": 1, ""pickup"": 3, ""eat"": 2, ""zap"": 1, ""southwest"": 1, ""northwest"": 1}",0.0

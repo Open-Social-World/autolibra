@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241209_naive-claude-3-5-haiku,MiniHack-CorridorBattle-Dark-v0,MiniHack-CorridorBattle-Dark-v0_run_04.json,-0.21000000000000005,60,True,1485931005,"{""north"": 5, ""northeast"": 6, ""east"": 15, ""southeast"": 2, ""south"": 10, ""west"": 22}",0.0

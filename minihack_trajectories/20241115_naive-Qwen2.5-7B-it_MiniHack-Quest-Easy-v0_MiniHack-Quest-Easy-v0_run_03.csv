@@ -1,0 +1,2 @@
+llm,task,run_file,episode_return,num_steps,done,seed,action_frequency,progression
+20241115_naive-Qwen2.5-7B-it,MiniHack-Quest-Easy-v0,MiniHack-Quest-Easy-v0_run_03.json,-0.36000000000000015,68,True,3753980098,"{""pickup"": 16, ""north"": 21, ""wait"": 27, ""east"": 4}",0.0
