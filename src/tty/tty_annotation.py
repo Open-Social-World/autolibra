@@ -46,65 +46,39 @@ class TTYAnnotator:
             )
 
     def _select_agent(self, instance_id: str) -> str:
-        """Display agent selection menu and return selected agent ID using arrow keys"""
-        import sys
-        import termios
-        import tty
-
-        def get_key() -> str | bool:
-            """Get a single keypress from stdin"""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(sys.stdin.fileno())
-                ch = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            return True if ch == "\x03" else ch
-
+        """Automatically select an unannotated agent for the given instance"""
         instance = self.dataset.get_instance_metadata(instance_id)
-        valid_agents = list(instance.agents.keys())
-        current_idx = 0
 
-        def render_menu() -> None:
-            """Render the agent selection menu"""
-            console.clear()
-            console.print(
-                "\n[bold]Available Agents:[/bold] (Use ↑↓ arrows to select, Enter to confirm)\n"
+        # Get all agents for this instance
+        valid_agents = list(instance.agents.keys())
+
+        # Check which agents haven't been annotated by this annotator
+        unannotated_agents = []
+        for agent_id in valid_agents:
+            trajectory_annotations = self.annotation_system.get_trajectory_annotations(
+                instance_id=instance_id, agent_id=agent_id
             )
 
-            for idx, agent_id in enumerate(valid_agents):
-                agent_info = instance.agents[agent_id]
-                description = agent_info.model_dump_json()
+            # Check if any annotations have been made at all
+            # Check if this trajectory has any annotations at all
+            if not trajectory_annotations.annotations:
+                unannotated_agents.append(agent_id)
 
-                if idx == current_idx:
-                    console.print(
-                        f"[bold white on blue] > {agent_id}: {description}[/bold white on blue]"
-                    )
-                else:
-                    console.print(f"   {agent_id}: {description}")
+        if not unannotated_agents:
+            raise ValueError(f"No unannotated agents found for instance {instance_id}")
 
-        while True:
-            render_menu()
-            key = get_key()
+        # Select the first unannotated agent
+        selected_agent = unannotated_agents[0]
 
-            if key == "\x1b":  # Arrow key prefix
-                get_key()  # Skip the [
-                arrow = get_key()
+        # Display the selected agent
+        agent_info = instance.agents[selected_agent]
+        description = agent_info.model_dump_json()
+        console.print(
+            f"\n[green]Selected agent for annotation:[/green] {selected_agent}"
+        )
+        console.print(f"Agent info: {description}\n")
 
-                if arrow == "A":  # Up arrow
-                    current_idx = (current_idx - 1) % len(valid_agents)
-                elif arrow == "B":  # Down arrow
-                    current_idx = (current_idx + 1) % len(valid_agents)
-
-            elif key == "\r":  # Enter key
-                console.print(
-                    f"\n[green]Selected agent:[/green] {valid_agents[current_idx]}"
-                )
-                return valid_agents[current_idx]
-
-            elif key in ("q", "\x03"):  # q or Ctrl+C
-                raise KeyboardInterrupt()
+        return selected_agent
 
     def _format_accessibility_tree(self, html_text: str) -> str:
         """Format accessibility tree for better readability"""
@@ -301,7 +275,7 @@ class TTYAnnotator:
         for key, value in instance.metadata.items():
             metadata_table.add_row(str(key), str(value))
 
-        # Let user select which agent to annotate
+        # Select an unannotated agent for evaluation
         selected_agent = self._select_agent(instance_id)
 
         console.print(metadata_table)
@@ -381,19 +355,16 @@ class TTYAnnotator:
             console.print("[red]No instances found in dataset![/red]")
             return
 
-        import random
-
         while True:
             console.clear()
             console.print("[bold]TTY Annotation Interface[/bold]\n")
 
-            # Filter out already annotated instances
-            unannotated_instances = []
+            # Create pairs of unannotated agents from instances and their instance_ids
+            unannotated_pairs = []
             for instance_id in instances:
                 instance = self.dataset.get_instance_metadata(instance_id)
-                any_agent_unannotated = False
 
-                # Check each agent for unannotated trajectories
+                # Check each agent in the instance
                 for agent_id in instance.agents:
                     trajectory_annotations = (
                         self.annotation_system.get_trajectory_annotations(
@@ -401,47 +372,31 @@ class TTYAnnotator:
                         )
                     )
 
-                    if not any(
-                        ann.annotator_id == self.annotator_id
-                        for ann in trajectory_annotations.annotations
-                    ):
-                        any_agent_unannotated = True
-                        break
+                    # If this agent hasn't been annotated by any annotator, add it
+                    if not trajectory_annotations.annotations:
+                        unannotated_pairs.append((instance_id, agent_id))
 
-                if any_agent_unannotated:
-                    unannotated_instances.append(instance_id)
-
-            # Calculate progress by checking actual annotations
-            total_agent_instances = 0
-            annotated_count = 0
-
-            for instance_id in instances:
-                instance = self.dataset.get_instance_metadata(instance_id)
-                for agent_id in instance.agents:
-                    total_agent_instances += 1
-                    trajectory_annotations = (
-                        self.annotation_system.get_trajectory_annotations(
-                            instance_id=instance_id, agent_id=agent_id
-                        )
-                    )
-                    if any(
-                        ann.annotator_id == self.annotator_id
-                        for ann in trajectory_annotations.annotations
-                    ):
-                        annotated_count += 1
+            # Calculate progress
+            total_agent_instances = sum(
+                len(self.dataset.get_instance_metadata(instance_id).agents)
+                for instance_id in instances
+            )
+            annotated_count = total_agent_instances - len(unannotated_pairs)
 
             console.print(
                 f"\n[cyan]Progress: {annotated_count}/{total_agent_instances} agent trajectories annotated[/cyan]"
             )
 
-            if not unannotated_instances:
+            if not unannotated_pairs:
                 console.print(
                     "\n[green]All agent trajectories have been annotated![/green]"
                 )
                 break
 
-            # Randomly select an instance
-            instance_id = random.choice(unannotated_instances)
+            # Randomly select an instance-agent pair
+            import random
+
+            instance_id, agent_id = random.choice(unannotated_pairs)
 
             # Display instance info
             instance = self.dataset.get_instance_metadata(instance_id)
@@ -449,6 +404,11 @@ class TTYAnnotator:
             console.print("[cyan]Instance metadata:[/cyan]")
             for key, value in instance.metadata.items():
                 console.print(f"  {key}: {value}")
+
+            # Display selected agent info
+            agent_info = instance.agents[agent_id]
+            console.print(f"\n[yellow]Selected agent:[/yellow] {agent_id}")
+            console.print(f"Agent info: {agent_info.model_dump_json()}\n")
 
             # Annotate instance
             console.print("\nPress Enter to start annotation, or 'q' to quit...")
