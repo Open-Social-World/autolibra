@@ -48,35 +48,36 @@ class TTYAnnotator:
     def _select_agent(self, instance_id: str) -> str:
         """Automatically select an unannotated agent for the given instance"""
         instance = self.dataset.get_instance_metadata(instance_id)
-        
+
         # Get all agents for this instance
         valid_agents = list(instance.agents.keys())
-        
+
         # Check which agents haven't been annotated by this annotator
         unannotated_agents = []
         for agent_id in valid_agents:
             trajectory_annotations = self.annotation_system.get_trajectory_annotations(
-                instance_id=instance_id,
-                agent_id=agent_id
+                instance_id=instance_id, agent_id=agent_id
             )
-            
+
             # Check if any annotations have been made at all
             # Check if this trajectory has any annotations at all
             if not trajectory_annotations.annotations:
                 unannotated_agents.append(agent_id)
-        
+
         if not unannotated_agents:
             raise ValueError(f"No unannotated agents found for instance {instance_id}")
-        
+
         # Select the first unannotated agent
         selected_agent = unannotated_agents[0]
-        
+
         # Display the selected agent
         agent_info = instance.agents[selected_agent]
         description = agent_info.model_dump_json()
-        console.print(f"\n[green]Selected agent for annotation:[/green] {selected_agent}")
+        console.print(
+            f"\n[green]Selected agent for annotation:[/green] {selected_agent}"
+        )
         console.print(f"Agent info: {description}\n")
-        
+
         return selected_agent
 
     def _format_accessibility_tree(self, html_text: str) -> str:
@@ -362,18 +363,19 @@ class TTYAnnotator:
             unannotated_pairs = []
             for instance_id in instances:
                 instance = self.dataset.get_instance_metadata(instance_id)
-                
+
                 # Check each agent in the instance
                 for agent_id in instance.agents:
-                    trajectory_annotations = self.annotation_system.get_trajectory_annotations(
-                        instance_id=instance_id,
-                        agent_id=agent_id
+                    trajectory_annotations = (
+                        self.annotation_system.get_trajectory_annotations(
+                            instance_id=instance_id, agent_id=agent_id
+                        )
                     )
-                    
+
                     # If this agent hasn't been annotated by any annotator, add it
                     if not trajectory_annotations.annotations:
                         unannotated_pairs.append((instance_id, agent_id))
-                    
+
             # Calculate progress
             total_agent_instances = sum(
                 len(self.dataset.get_instance_metadata(instance_id).agents)
@@ -386,11 +388,14 @@ class TTYAnnotator:
             )
 
             if not unannotated_pairs:
-                console.print("\n[green]All agent trajectories have been annotated![/green]")
+                console.print(
+                    "\n[green]All agent trajectories have been annotated![/green]"
+                )
                 break
 
             # Randomly select an instance-agent pair
             import random
+
             instance_id, agent_id = random.choice(unannotated_pairs)
 
             # Display instance info
