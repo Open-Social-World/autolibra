@@ -10,8 +10,10 @@
 #     metrics += new_metrics
 
 import asyncio
+from datetime import datetime
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
+from osw_data.metrics import MetricSet
 from osw_eval_core import (
     MetricTrainingInstance,
     feedback_grounding,
@@ -19,14 +21,14 @@ from osw_eval_core import (
 )
 
 
-async def main() -> None:
+async def main(dataset_name: str) -> None:
     dataset = MultiAgentDataset(
         name="dataset",
-        base_path=".data/cogym",
+        base_path=f".data/{dataset_name}",
     )
 
     annotation_system = AnnotationSystem(
-        base_path=".data/annotations/cogym",
+        base_path=f".data/annotations/{dataset_name}",
     )
 
     metric_training_instances: list[MetricTrainingInstance] = []
@@ -60,11 +62,15 @@ async def main() -> None:
 
     behavior_clustering_results = await behavior_clustering(feedback_grounding_results)
 
-    with open("behavior_clustering_results.jsonl", "w") as f:
-        for behavior_clustering_result in behavior_clustering_results.metrics:
-            f.write(behavior_clustering_result.model_dump_json(indent=2))
-            f.write("\n")
+    metric_set = MetricSet(
+        name="Derived Metrics",
+        base_path=f".data/metrics/{dataset_name}/{datetime.now().strftime('%m_%d_%H_%M')}",
+        induced_from=dataset_name,
+        version="0.1",
+    )
+
+    metric_set.add_metrics(behavior_clustering_results.metrics)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main("webvoyager-nnetnav"))

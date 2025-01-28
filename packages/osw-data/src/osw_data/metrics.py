@@ -26,7 +26,7 @@ class MetricSet:
     def __init__(
         self,
         name: str,
-        base_path: Path,
+        base_path: Path | str,
         induced_from: str,
         version: str | None = None,
     ):

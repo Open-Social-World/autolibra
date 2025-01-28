@@ -3,13 +3,16 @@ from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 from osw_eval_core.configs import OSWEvalSettings
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .generator import render_training_instance, MetricTrainingInstance
 
 
 class BehavirorFeedback(BaseModel):
     feedback: str
     behavior: str
+    is_positive: bool = Field(
+        description="Whether the feedback is positive or negative."
+    )
 
 
 class FeedbackGroundingOutput(BaseModel):

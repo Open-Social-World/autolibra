@@ -110,7 +110,7 @@ def render_training_instance(training_instance: MetricTrainingInstance) -> str:
             f"The task is {training_instance.task}",
         ]
         + [
-            f"{'Observation' if p.point_type == 'observation' else 'Action'}: {training_instance.trajectory.get_data_at(i)}"
+            f"{'Observation' if p.point_type == 'observation' else 'Action'}: {str(training_instance.trajectory.get_data_at(i))[:8000]}"
             for i, p in enumerate(training_instance.trajectory.points)
         ]
     )
