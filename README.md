@@ -34,8 +34,12 @@ uv run python src/tty/tty_annotation.py .data/webarena .data/annotations/webaren
 
 ### Annotation Web Interface with Streamlit
 ```bash
-uv run streamlit run src/tty/tty_annotation.py .data/sotopia .data/annotations/sotopia -- --annotator-id <your name>
+uv run streamlit run src/tty/tty_annotation.py .data/sotopia .data/annotations/sotopia -- --annotator-id <your name> --use-streamlit
 ```
+
+### View Annotations with Streamlit
+```bash
+streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotations
 
 ### To run metric extraction
 ```bash
