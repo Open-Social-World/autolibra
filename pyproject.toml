@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "osw-eval"
 version = "0.1.0"
@@ -10,6 +14,7 @@ dependencies = [
     "rich>=13.9.4",
     "typer>=0.15.1",
     "uvicorn>=0.34.0",
+    "streamlit"
 ]
 
 [tool.uv]
@@ -32,3 +37,6 @@ members = ["packages/*"]
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "stubs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/osw_data"]

@@ -6,6 +6,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
 import json
+import streamlit as st
 
 from osw_data.annotation import AnnotationSystem, AnnotationSpan
 from osw_data.dataset import MultiAgentDataset
@@ -145,26 +146,22 @@ class TTYAnnotator:
     def _display_observation(self, data: Any, media_type: MediaType) -> None:
         """Display an observation based on its media type"""
         if media_type == MediaType.JSON:
-            # Handle HTML-like accessibility tree specially
-            if (
-                isinstance(data, dict)
-                and "html" in data
-                and isinstance(data["html"], str)
-            ):
+            if isinstance(data, dict) and "html" in data and isinstance(data["html"], str):
                 # Display URL if present
                 if "url" in data:
-                    console.print(
-                        Panel(f"[bold blue]{data['url']}[/bold blue]", title="URL")
-                    )
+                    console.print(Panel(f"[bold blue]{data['url']}[/bold blue]", title="URL"))
+                    st.markdown("#### 🌐 URL")
+                    st.info(data['url'])
 
                 # Format and display the accessibility tree
                 formatted_html = self._format_accessibility_tree(data["html"])
                 console.print(Panel(formatted_html, title="Page Structure"))
+                st.markdown("#### 📄 Page Structure")
+                with st.expander("View Page Structure", expanded=True):
+                    st.code(formatted_html, language="")
             else:
-                # Pretty print other JSON data
                 json_str = json.dumps(data, indent=2)
-
-                # Helper func to clean json strings
+                
                 def clean_json_obs(json_str: str) -> str:
                     # Remove the outer curly brackets
                     content = json_str.strip("{}")
@@ -182,59 +179,71 @@ class TTYAnnotator:
                     # Replace escaped quotes with regular quotes
                     content = content.replace("\\'", "'")
 
-                    # Add Rich formatting to labels (text between newline and colon)
-                    formatted_lines = []
+                    # Format the content with proper line breaks
+                    console_lines = []
+                    st_lines = []
+                    
                     for line in content.split("\n"):
                         # Skip empty lines and standalone quotes
                         if line.strip() in ["", '"']:
                             continue
 
                         if ":" in line:
-                            # Split at the first colon
                             label, rest = line.split(":", 1)
-                            # Format the label if it's not empty
                             if label.strip():
-                                formatted_line = (
-                                    f"[bold green]{label}[/bold green]:{rest}"
-                                )
+                                console_line = f"[bold green]{label}[/bold green]:{rest}"
+                                # For Streamlit, wrap in markdown code block
+                                st_line = f"**{label}**:{rest}"
                             else:
-                                formatted_line = line
+                                console_line = line
+                                st_line = line
                         else:
-                            formatted_line = line
-                        formatted_lines.append(formatted_line)
+                            console_line = line
+                            st_line = line
+                            
+                        console_lines.append(console_line)
+                        st_lines.append(st_line)
 
-                    # Remove any trailing empty lines
-                    while formatted_lines and not formatted_lines[-1].strip():
-                        formatted_lines.pop()
+                    return (
+                        "\n".join(console_lines),  # Console version
+                        "\n\n".join(st_lines)      # Streamlit version with double newlines
+                    )
 
-                    return "\n".join(formatted_lines)
+                console_str, st_str = clean_json_obs(json_str)
+                width = min(console.width - 2, 120)
 
-                cleaned_str = clean_json_obs(json_str)
-                # Get console width and adjust panel width
-                width = min(
-                    console.width - 2, 120
-                )  # Max width of 120 or console width - 2
-                console.print(
-                    Panel(cleaned_str, title="Observation (JSON)", width=width)
-                )
+                # Console display (with Rich formatting)
+                console.print(Panel(console_str, title="Observation (JSON)", width=width))
+                
+                # Enhanced Streamlit display
+                st.markdown("#### 👁️ Observation")
+                with st.container():
+                    st.info(st_str)
 
         elif media_type == MediaType.TEXT:
             # Display text data
             console.print(Panel(str(data), title="Observation (Text)"))
+            
+            # Enhanced Streamlit display
+            st.markdown("#### 📝 Observation (Text)")
+            st.info(str(data).replace("\n", "\n\n"))
 
         elif media_type == MediaType.IMAGE:
             # Just indicate image dimensions for TTY interface
             console.print(f"[Image observation with shape {data.shape}]")
+            
+            # Enhanced Streamlit display
+            st.markdown("#### 🖼️ Image Observation")
+            st.info(f"Image with shape {data.shape}")
 
         else:
             console.print(f"[Unsupported media type: {media_type}]")
+            st.error(f"Unsupported media type: {media_type}")
 
-    def _display_action(self, data: Any) -> None:
+    def _display_action(self, data: Any, agent_name: str = "") -> None:
         """Display an action"""
         if isinstance(data, dict):
-            # Pretty print action data
             json_str = json.dumps(data, indent=2)
-
             def clean_json_action(json_str: str) -> str:
                 # Remove the outer curly brackets
                 content = json_str.strip("{}")
@@ -247,25 +256,51 @@ class TTYAnnotator:
                 content = content.replace("\\n", "\n\n")
                 # Replace escaped quotes with regular quotes
                 content = content.replace("\\'", "'")
+                
+                # Add agent name prefix if provided
+                if agent_name:
+                    content = f"{agent_name} {content}"
+                
+                # Remove Rich formatting tags
+                content = content.replace("[bold green]", "").replace("[/bold green]", "")
+                content = content.replace("[bold]", "").replace("[/bold]", "")
+                content = content.replace("[dim]", "").replace("[/dim]", "")
 
-                return content
+                # Ensure proper markdown line breaks
+                return content.replace("\n", "\n\n")
 
             cleaned_json_str = clean_json_action(json_str)
-            # Get console width and adjust panel width
-            width = min(console.width - 2, 120)  # Max width of 120 or console width - 2
-            console.print(Panel(cleaned_json_str, title="Action", width=width))
+            width = min(console.width - 2, 120)
+            
+            # Display in console
+            panel = Panel(cleaned_json_str, title="Action", width=width)
+            console.print(panel)
+            
+            # Enhanced Streamlit display
+            st.markdown("#### 🎯 Action")
+            with st.container():
+                st.success(cleaned_json_str)
         else:
-            console.print(Panel(str(data), title="Action"))
+            # Handle non-dict data
+            panel = Panel(str(data), title="Action")
+            console.print(panel)
+            
+            # Enhanced Streamlit display
+            st.markdown("#### 🎯 Action")
+            st.success(str(data).replace("\n", "\n\n"))
 
     def annotate_instance(self, instance_id: str) -> bool:
         """Annotate a specific instance"""
-        console.clear()
-
+        # Keep console output
+        console.print(f"\n[bold blue]Annotating Instance:[/bold blue] {instance_id}")
+        
+        # Enhanced Streamlit display
+        st.title(f"🔍 Annotating Instance: {instance_id}")
+        
         # Get instance metadata
         instance = self.dataset.get_instance_metadata(instance_id)
 
         # Display instance info
-        console.print(f"\n[bold blue]Annotating Instance:[/bold blue] {instance_id}")
         console.print(Markdown("### Instance Metadata"))
 
         metadata_table = Table(show_header=True)
@@ -280,6 +315,18 @@ class TTYAnnotator:
 
         console.print(metadata_table)
         console.print("\n")
+
+        # Enhanced Streamlit metadata display
+        st.markdown("### 📊 Instance Metadata")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Keys**")
+            for key in instance.metadata.keys():
+                st.markdown(f"- {key}")
+        with col2:
+            st.markdown("**Values**")
+            for value in instance.metadata.values():
+                st.markdown(f"- {value}")
 
         # Get selected agent's trajectory
         trajectory = self.dataset.get_trajectory(instance_id, selected_agent)
@@ -308,16 +355,17 @@ class TTYAnnotator:
             if point.point_type == PointType.OBSERVATION:
                 self._display_observation(data, point.data_reference.media_type)
             else:
-                self._display_action(data)
+                self._display_action(data, selected_agent)
 
             console.print(
                 "\nPress Enter to continue, 's' to skip this instance, 'q' to quit annotation..."
             )
-            user_input = input().lower()
-            if user_input == "s":
+            if st.button("Continue"):
+                pass
+            if st.button("Skip"):
                 console.print("\n[yellow]Skipping this instance...[/yellow]")
-                return False  # Return False to indicate skip
-            elif user_input == "q":
+                return False
+            if st.button("Quit"):
                 console.print("\n[red]Quit Annotation...[/red]")
                 raise KeyboardInterrupt()
 
@@ -345,85 +393,136 @@ class TTYAnnotator:
 
     def run(self) -> None:
         """Run the annotation interface"""
-        console.clear()
-        console.print("[bold]TTY Annotation Interface[/bold]\n")
+        # Initialize session state if not exists
+        if 'current_instance' not in st.session_state:
+            st.session_state.current_instance = None
+            st.session_state.trajectory_index = 0
+            st.session_state.instances = self.dataset.list_instances()
+            st.session_state.feedback = ""
+            st.session_state.quit = False  # Add quit state
 
+        # Check if user has quit
+        if st.session_state.quit:
+            st.title("✨ Done annotating for now!")
+            st.balloons()  # Add a fun effect
+            st.success("Thank you for your annotations! You can close this window.")
+            return
+
+        st.title("My Annotations")
+        
         # Get all instances
-        instances = self.dataset.list_instances()
-
+        instances = st.session_state.instances
+        
         if not instances:
+            st.error("No instances found in dataset!")
             console.print("[red]No instances found in dataset![/red]")
             return
 
-        while True:
-            console.clear()
-            console.print("[bold]TTY Annotation Interface[/bold]\n")
-
-            # Create pairs of unannotated agents from instances and their instance_ids
-            unannotated_pairs = []
-            for instance_id in instances:
-                instance = self.dataset.get_instance_metadata(instance_id)
-
-                # Check each agent in the instance
-                for agent_id in instance.agents:
-                    trajectory_annotations = (
-                        self.annotation_system.get_trajectory_annotations(
-                            instance_id=instance_id, agent_id=agent_id
-                        )
-                    )
-
-                    # If this agent hasn't been annotated by any annotator, add it
-                    if not trajectory_annotations.annotations:
-                        unannotated_pairs.append((instance_id, agent_id))
-
-            # Calculate progress
-            total_agent_instances = sum(
-                len(self.dataset.get_instance_metadata(instance_id).agents)
-                for instance_id in instances
-            )
-            annotated_count = total_agent_instances - len(unannotated_pairs)
-
-            console.print(
-                f"\n[cyan]Progress: {annotated_count}/{total_agent_instances} agent trajectories annotated[/cyan]"
-            )
-
-            if not unannotated_pairs:
-                console.print(
-                    "\n[green]All agent trajectories have been annotated![/green]"
-                )
-                break
-
-            # Randomly select an instance-agent pair
-            import random
-
-            instance_id, agent_id = random.choice(unannotated_pairs)
-
-            # Display instance info
+        # Display progress
+        total_agent_instances = sum(
+            len(self.dataset.get_instance_metadata(instance_id).agents)
+            for instance_id in instances
+        )
+        
+        # Calculate unannotated pairs
+        unannotated_pairs = []
+        for instance_id in instances:
             instance = self.dataset.get_instance_metadata(instance_id)
-            console.print(f"\n[yellow]Selected instance:[/yellow] {instance_id}")
-            console.print("[cyan]Instance metadata:[/cyan]")
-            for key, value in instance.metadata.items():
-                console.print(f"  {key}: {value}")
-
-            # Display selected agent info
-            agent_info = instance.agents[agent_id]
-            console.print(f"\n[yellow]Selected agent:[/yellow] {agent_id}")
-            console.print(f"Agent info: {agent_info.model_dump_json()}\n")
-
-            # Annotate instance
-            console.print("\nPress Enter to start annotation, or 'q' to quit...")
-            if input().lower() == "q":
-                break
-
-            completed = self.annotate_instance(instance_id)
-            if completed is False:
-                console.print(
-                    "\nSkipped instance. Press Enter for next random instance, or 'q' to quit..."
+            for agent_id in instance.agents:
+                trajectory_annotations = self.annotation_system.get_trajectory_annotations(
+                    instance_id=instance_id, agent_id=agent_id
                 )
+                if not trajectory_annotations.annotations:
+                    unannotated_pairs.append((instance_id, agent_id))
+        
+        annotated_count = total_agent_instances - len(unannotated_pairs)
+        st.progress(annotated_count / total_agent_instances)
+        st.write(f"Progress: {annotated_count}/{total_agent_instances} agent trajectories annotated")
+        console.print(f"\n[cyan]Progress: {annotated_count}/{total_agent_instances} agent trajectories annotated[/cyan]")
 
-            console.print("\nPress Enter for next random instance, or 'q' to quit...")
-            if input().lower() == "q":
-                break
+        if not unannotated_pairs:
+            st.success("All agent trajectories have been annotated!")
+            console.print("\n[green]All agent trajectories have been annotated![/green]")
+            return
+
+        # Handle instance selection and annotation
+        if st.session_state.current_instance is None:
+            import random
+            instance_id, agent_id = random.choice(unannotated_pairs)
+            st.session_state.current_instance = instance_id
+            st.session_state.current_agent = agent_id
+            st.session_state.trajectory_index = 0
+
+        # Display current instance
+        instance = self.dataset.get_instance_metadata(st.session_state.current_instance)
+        trajectory = self.dataset.get_trajectory(st.session_state.current_instance, st.session_state.current_agent)
+        trajectory_points = [
+            (point, trajectory.get_data_at(idx))
+            for idx, point in enumerate(trajectory.points)
+        ]
+        trajectory_points.sort(key=lambda x: x[0].timestamp)
+
+        # Display metadata
+        st.markdown(f"Instance: **{st.session_state.current_instance}**")
+        console.print(f"\n[bold blue]Annotating Instance:[/bold blue] {st.session_state.current_instance}")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Skip Instance"):
+                st.session_state.current_instance = None
+                st.rerun()
+        with col2:
+            if st.button("Quit"):
+                st.session_state.quit = True  # Set quit state instead of raising KeyboardInterrupt
+                st.rerun()
+
+        # Display current trajectory point
+        if st.session_state.trajectory_index < len(trajectory_points):
+            point, data = trajectory_points[st.session_state.trajectory_index]
+            
+            # Add agent name header
+            st.markdown(f"### 👤 {st.session_state.current_agent}'s Trajectory")
+            
+            st.write(f"Time: {point.timestamp}")
+            console.print(f"\n[cyan]Time:[/cyan] {point.timestamp}")
+
+            if point.point_type == PointType.OBSERVATION:
+                self._display_observation(data, point.data_reference.media_type)
+            else:
+                self._display_action(data, st.session_state.current_agent)
+
+            if st.button("Next"):
+                st.session_state.trajectory_index += 1
+                st.rerun()
+        else:
+            # Trajectory complete, get annotation
+            st.success("Trajectory complete!")
+            console.print("\n[bold green]Trajectory complete![/bold green]")
+            
+            feedback = st.text_area("Please provide your feedback on the trajectory:", 
+                                  value=st.session_state.feedback)
+            
+            if st.button("Submit Annotation"):
+                # Save annotation
+                self.annotation_system.add_annotation(
+                    instance_id=st.session_state.current_instance,
+                    agent_id=st.session_state.current_agent,
+                    annotator_id=self.annotator_id,
+                    content={"feedback": feedback},
+                    span=AnnotationSpan(
+                        start_time=trajectory_points[0][0].timestamp,
+                        end_time=trajectory_points[-1][0].timestamp,
+                    ),
+                )
+                
+                st.success("Annotation saved!")
+                console.print("\n[bold green]Annotation saved![/bold green]")
+                
+                # Reset for next instance
+                st.session_state.current_instance = None
+                st.session_state.trajectory_index = 0
+                st.session_state.feedback = ""
+                st.rerun()
 
 
 @app.command()
