@@ -73,4 +73,4 @@ async def main(dataset_name: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main("webvoyager-nnetnav"))
+    asyncio.run(main("sotopia"))

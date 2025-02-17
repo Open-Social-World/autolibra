@@ -49,7 +49,7 @@ async def feedback_grounding(
     while True:
         try:
             completion = await client.beta.chat.completions.parse(
-                model="gpt-4o-241120",
+                model=settings.azure_openai_4o_model,
                 messages=[
                     {
                         "role": "system",

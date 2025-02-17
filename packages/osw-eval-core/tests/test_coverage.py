@@ -4,7 +4,6 @@ from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
 from osw_eval_core.evaluators.coverage_evaluator_v2 import (
     match_aspects_and_traits,
-    create_aspect_traits_match_model,
 )
 from osw_eval_core.gen_eval.feedback_grounding import BehavirorFeedback
 import pytest
@@ -61,12 +60,8 @@ async def test_match_aspects_and_traits():
         azure_endpoint=settings.azure_endpoint,
     )
 
-    result_model = create_aspect_traits_match_model(aspects=_aspects, traits=_traits)
-
-    print(result_model.model_json_schema())
-
     _ = await match_aspects_and_traits(
         client=client,
-        aspects=_aspects[:1],
+        aspects=_aspects,
         traits=_traits,
     )

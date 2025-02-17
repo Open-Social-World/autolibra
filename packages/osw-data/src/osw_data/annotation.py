@@ -248,3 +248,17 @@ class AnnotationSystem:
                     annotations[key] = time_anns
 
         return annotations
+
+    def get_all_annotations(self) -> dict[str, list[Annotation]]:
+        """Get all annotations"""
+        annotations = {}
+        for annotation_file in self.annotations_path.glob("*.json"):
+            with open(annotation_file, "r") as f:
+                trajectory_annotations = TrajectoryAnnotations.model_validate_json(
+                    f.read()
+                )
+
+                key = f"{trajectory_annotations.instance_id}_{trajectory_annotations.agent_id}"
+                annotations[key] = trajectory_annotations.annotations
+
+        return annotations

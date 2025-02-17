@@ -146,7 +146,7 @@ def llm_evaluation(
         while True:
             # try:
             result = client.beta.chat.completions.parse(
-                model="gpt-4o-241120",  # replace with the model deployment name of your gpt-4o 2024-08-06 deployment
+                model=settings.azure_openai_4o_model,
                 messages=[
                     {"role": "system", "content": "Following the user instruction."},
                     {"role": "user", "content": prompt},

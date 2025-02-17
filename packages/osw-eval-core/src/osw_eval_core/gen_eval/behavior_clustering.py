@@ -37,10 +37,13 @@ async def behavior_clustering(
         azure_endpoint=settings.azure_endpoint,
     )
 
+    assert settings.azure_openai_o3_model is not None
+
     while True:
         try:
             completion = await client.beta.chat.completions.parse(
-                model="o1-241217",
+                model=settings.azure_openai_o3_model,
+                reasoning_effort="high",
                 messages=[
                     # {"role": "system", "content": "Cluster the behaviors."},
                     {"role": "user", "content": prompt},

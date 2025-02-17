@@ -34,18 +34,17 @@ async def main(dataset_name: str, metric_path: str) -> None:
             trajectory_annotations = annotation_system.get_trajectory_annotations(
                 instance_id=instances, agent_id=agent_id
             )
-            if agent_id == "agent":
-                for annotation in trajectory_annotations.annotations:
-                    metric_training_instances.append(
-                        MetricTrainingInstance(
-                            task=instance.metadata["task"]
-                            if "task" in instance.metadata
-                            else "Task is described in the trajectory observation",
-                            agent_id=agent_id,
-                            trajectory=dataset.get_trajectory(instances, agent_id),
-                            feedback=annotation.content["feedback"],
-                        )
+            for annotation in trajectory_annotations.annotations:
+                metric_training_instances.append(
+                    MetricTrainingInstance(
+                        task=instance.metadata["task"]
+                        if "task" in instance.metadata
+                        else "Task is described in the trajectory observation",
+                        agent_id=agent_id,
+                        trajectory=dataset.get_trajectory(instances, agent_id),
+                        feedback=annotation.content,
                     )
+                )
 
     eval_results = await run_llm_eval(
         metric_training_instances, list(metric_set.metrics.values())
@@ -59,20 +58,32 @@ async def main(dataset_name: str, metric_path: str) -> None:
         for eval_result in eval_results
     ]
 
+    with open("llm_eval_results.jsonl", "w") as f:
+        for eval_result in eval_results:
+            f.write(eval_result.model_dump_json())
+            f.write("\n")
+
     coverage_results = await run_coverage_eval(
         metric_set.metrics.values(), eval_scoring, metric_training_instances
     )
 
     covered, total = 0, 0
+    redundant, total_traits = 0, 0
 
     for coverage_result in coverage_results:
         covered += coverage_result[0]
         total += coverage_result[1]
+        redundant += coverage_result[2]
+        total_traits += coverage_result[3]
 
     print(f"Coverage: {covered}/{total}")
+    print(f"Redundancy: {redundant}/{total_traits}")
 
 
 if __name__ == "__main__":
     asyncio.run(
-        main(dataset_name="webarena", metric_path=".data/metrics/webarena/01_21_12_33")
+        main(
+            dataset_name="sotopia",
+            metric_path=".data/metrics/webvoyager-nnetnav/01_28_11_30",
+        ),
     )

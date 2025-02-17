@@ -1,7 +1,7 @@
 import asyncio
 from importlib import resources
 import pickle
-from typing import Any
+from typing import Any, Literal
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
@@ -9,7 +9,7 @@ from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
 from osw_eval_core.gen_eval.generator import MetricTrainingInstance
 from ..gen_eval.feedback_grounding import BehavirorFeedback, feedback_grounding
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError, create_model, Field
 
 
 def _load_template() -> jinja2.Template:
@@ -19,20 +19,36 @@ def _load_template() -> jinja2.Template:
         return jinja2.Template(f.read())
 
 
+def sanitize_string(s: str) -> str:
+    return (
+        s.replace("\\'", "")
+        .replace('\\"', "")
+        .replace("\\n", " ")
+        .replace("'", "")
+        .replace('"', "")
+        .replace("\n", " ")
+        .replace("\\", " ")
+        .replace("ℹ", " ")
+    )
+
+
 def create_aspect_traits_match_json_schema(
     aspects: list[BehavirorFeedback], traits: list[Metric]
 ) -> dict[str, Any]:
     # First, let's prepare the traits tuple once since it's the same for all trait fields
-    trait_options = tuple(f"{trait.name}: {trait.explanation}" for trait in traits) + (
+    trait_options = [
+        f"{sanitize_string(trait.name)}: {sanitize_string(trait.explanation)}"
+        for trait in traits
+    ] + [
         "None of the traits matches the aspect.",
-    )
+    ]
 
     # Create fields for aspects and traits
     schema = {}
     schema["properties"] = {}
     for i in range(len(aspects)):
         # Combine behavior and feedback with properly escaped strings
-        aspect_text = f"{aspects[i].feedback} {aspects[i].behavior}"
+        aspect_text = f"{sanitize_string(aspects[i].feedback)} {sanitize_string(aspects[i].behavior)}"
 
         schema["properties"][f"aspect_{i}"] = {
             "type": "string",
@@ -51,14 +67,48 @@ def create_aspect_traits_match_json_schema(
     ]
     schema["title"] = "AspectTraitsMatch"
     schema["type"] = "object"
+    schema["additionalProperties"] = False
 
     return schema
+
+
+async def create_aspect_traits_match_pydantic_model(
+    aspects: list[BehavirorFeedback], traits: list[Metric]
+) -> BaseModel:
+    fields: dict[str, tuple[type[Literal[str]], Field]] = {}
+    for i in range(len(aspects)):
+        fields[f"aspect_{i}"] = (
+            Literal[
+                sanitize_string(aspects[i].feedback)
+                + ": "
+                + sanitize_string(aspects[i].behavior)
+            ],
+            Field(title=f"Aspect {i}"),
+        )
+
+        fields[f"trait_{i}"] = (
+            Literal[
+                tuple(
+                    sanitize_string(trait.name)
+                    + ": "
+                    + sanitize_string(trait.explanation)
+                    for trait in traits
+                )
+                + ("None of the traits matches the aspect.",)
+            ],
+            Field(title=f"Trait {i}"),
+        )
+
+    return create_model("AspectTraitsMatch", **fields)
 
 
 async def match_aspects_and_traits(
     client: AsyncAzureOpenAI, aspects: list[BehavirorFeedback], traits: list[Metric]
 ) -> BaseModel:
-    aspect_traits_match_schema = create_aspect_traits_match_json_schema(aspects, traits)
+    settings = OSWEvalSettings()
+    aspect_traits_model = await create_aspect_traits_match_pydantic_model(
+        aspects, traits
+    )
 
     template = _load_template()
     prompt = template.render(
@@ -69,34 +119,28 @@ async def match_aspects_and_traits(
     while True:
         wait_time = 1
         try:
-            completion = await client.chat.completions.parse(
-                model="gpt-4o-241120",
+            completion = await client.beta.chat.completions.parse(
+                model=settings.azure_openai_4o_model,
                 messages=[
                     {"role": "system", "content": "Match the aspects with the traits."},
                     {"role": "user", "content": prompt},
                 ],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "AspectTraitsMatch",
-                        "schema": aspect_traits_match_schema,
-                        "strict": True,
-                    },
-                },
+                response_format=aspect_traits_model,
             )
             break
+        except ValidationError as e:
+            print(e)
+            print(aspect_traits_model.model_json_schema())
         except RateLimitError as e:
             print(e)
             wait_time *= 2
             await asyncio.sleep(wait_time)
         except openai.BadRequestError as e:
+            print(aspect_traits_model.model_json_schema())
             print(e)
             raise e
 
-    if not completion.choices[0].message.parsed:
-        raise ValueError("Failed to parse the completion.")
-    else:
-        return completion.choices[0].message.parsed
+    return completion.choices[0].message.parsed
 
 
 async def run_instance_coverage_eval(
@@ -104,7 +148,7 @@ async def run_instance_coverage_eval(
     aspects: list[BehavirorFeedback],
     traits: list[Metric],
     ratings: list[int],
-) -> tuple[int, int]:
+) -> tuple[int, int, int, int, list[BehavirorFeedback]]:
     positive_aspects = [aspect for aspect in aspects if aspect.is_positive]
     negative_aspects = [aspect for aspect in aspects if not aspect.is_positive]
     positive_traits = [trait for (trait, rating) in zip(traits, ratings) if rating == 1]
@@ -131,6 +175,7 @@ async def run_instance_coverage_eval(
 
     number_of_total_aspects = len(aspects)
     number_of_not_matched_aspects = 0
+    unmatch_aspects: list[BehavirorFeedback] = []
 
     for i in range(len(positive_aspects)):
         if (
@@ -138,6 +183,7 @@ async def run_instance_coverage_eval(
             == "None of the traits matches the aspect."
         ):
             number_of_not_matched_aspects += 1
+            unmatch_aspects.append(positive_aspects[i])
 
     for i in range(len(negative_aspects)):
         if (
@@ -145,10 +191,30 @@ async def run_instance_coverage_eval(
             == "None of the traits matches the aspect."
         ):
             number_of_not_matched_aspects += 1
+            unmatch_aspects.append(negative_aspects[i])
+
+    used_traits = set()
+
+    for i in range(len(positive_aspects)):
+        if (
+            positive_match_results.model_dump()[f"trait_{i}"]
+            != "None of the traits matches the aspect."
+        ):
+            used_traits.add(positive_match_results.model_dump()[f"trait_{i}"])
+
+    for i in range(len(negative_aspects)):
+        if (
+            negative_match_results.model_dump()[f"trait_{i}"]
+            != "None of the traits matches the aspect."
+        ):
+            used_traits.add(negative_match_results.model_dump()[f"trait_{i}"])
 
     return (
         number_of_total_aspects - number_of_not_matched_aspects,
         number_of_total_aspects,
+        len(traits) - len(used_traits),
+        len(traits),
+        unmatch_aspects,
     )
 
 

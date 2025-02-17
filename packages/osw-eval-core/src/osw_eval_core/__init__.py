@@ -6,7 +6,8 @@ from .gen_eval import (
     behavior_clustering,
 )
 
-from .evaluators import run_llm_eval, coverage_eval
+from .evaluators import run_llm_eval
+# coverage_eval
 
 __all__ = [
     "propose_metrics",
@@ -15,5 +16,5 @@ __all__ = [
     "feedback_grounding",
     "behavior_clustering",
     "run_llm_eval",
-    "coverage_eval",
+    # "coverage_eval",
 ]

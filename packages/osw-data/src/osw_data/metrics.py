@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
-from pydantic import BaseModel, Field
+from typing import Annotated
+from pydantic import AfterValidator, BaseModel, Field
 
 
 class MetricSetMetadata(BaseModel):
@@ -15,7 +16,7 @@ class Metric(BaseModel):
     good_behaviors: list[str] = Field(default_factory=list)
     bad_behaviors: list[str] = Field(default_factory=list)
     explanation: str
-    name: str
+    name: Annotated[str, AfterValidator(lambda x: x.replace("/", "_"))]
 
 
 class MetricSet:

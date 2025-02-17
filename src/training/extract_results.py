@@ -26,7 +26,7 @@ def convert_jsonl_to_table(file_path):
 
 if __name__ == "__main__":
     # Replace 'your_file.jsonl' with your actual file path
-    file_path = "eval_results.jsonl"
+    file_path = "llm_eval_results.jsonl"
     try:
         df = convert_jsonl_to_table(file_path)
 

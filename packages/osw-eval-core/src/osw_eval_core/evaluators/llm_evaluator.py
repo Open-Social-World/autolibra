@@ -51,6 +51,7 @@ semaphore = asyncio.Semaphore(20)  # Limit to 3 concurrent tasks
 async def eval_instance(
     instance: MetricTrainingInstance, metrics: list[Metric], client: AsyncAzureOpenAI
 ) -> list[BaseModel]:
+    settings = OSWEvalSettings()
     template = _load_llm_eval_template()
 
     prompt = template.render(
@@ -63,13 +64,18 @@ async def eval_instance(
             wait_time = 1
             try:
                 completion = await client.beta.chat.completions.parse(
-                    model="gpt-4o-241120",
+                    model=settings.azure_openai_4o_model,
                     messages=[
                         {"role": "system", "content": "Evaluate the trajectory."},
                         {"role": "user", "content": prompt},
                     ],
                     response_format=_make_evaluation_result_class(metrics),
                 )
+
+                if not completion.choices[0].message.parsed:
+                    print("Failed to parse the response. Retrying.")
+                    await asyncio.sleep(wait_time)
+                    continue
                 break
             except (ValidationError, RateLimitError) as e:
                 print(e)
