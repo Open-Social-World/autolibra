@@ -78,6 +78,8 @@ class BalrogConverter(BaseConverter):
         """Convert Balrog data to osw dataset format"""
         self.logger.info("Creating Balrog dataset...")
 
+        ref_time = datetime.now() # Used for step_id
+
         # Iterate over task folders in source_path
         for task in os.listdir(self.source_path):
             if task == "minihack":
@@ -123,13 +125,10 @@ class BalrogConverter(BaseConverter):
                 }
 
                 # Create instance metadata (this does not change within a subtask)
-                instance_metadata = dataset.create_instance(
-                    agents_metadata=agents_metadata,
-                    instance_metadata={
-                        "task": json_file["task"],
-                        "source_model": json_file["client"]["model_id"],
+                instance_metadata={
+                    "task": json_file["task"],
+                    "source_model": json_file["client"]["model_id"],
                     }
-                )
 
                 instance_id = dataset.create_instance(
                     agents_metadata=agents_metadata,
@@ -138,7 +137,9 @@ class BalrogConverter(BaseConverter):
                 with open(traj_file) as f:
                     for line in f: # Format of Step,Action,Reasoning,Observation,Reward,Done
 
-                        step_id = line.split(",")[0]
+                        # Convert to datetime by adding to now
+                        step_id = line.split(",")[0] 
+                        step_id = ref_time + datetime.timedelta(seconds=int(step_id))
                         actions = line.split(",")[1]
                         reasoning = line.split(",")[2]
                         observations = line.split(",")[3]
