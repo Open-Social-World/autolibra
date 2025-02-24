@@ -12,7 +12,7 @@ import sys
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from .data.utils import download_github_folder, file_pairs
+from ..data.utils import download_github_folder, file_pairs
 
 class BalrogConverter(BaseConverter):
     """Handles downloading and converting Balrog data to our dataset format"""
