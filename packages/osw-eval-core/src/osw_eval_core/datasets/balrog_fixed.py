@@ -3,7 +3,7 @@ import zipfile
 import json
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import sys
@@ -12,7 +12,7 @@ import sys
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from ..data.utils import download_github_folder, file_pairs
+from osw_data.utils import download_github_folder, file_pairs
 
 class BalrogConverter(BaseConverter):
     """Handles downloading and converting Balrog data to our dataset format"""
@@ -66,13 +66,32 @@ class BalrogConverter(BaseConverter):
         # )
 
     def download_data(self) -> None:
-        """Download MiniHack-Balrog dataset files"""
+        """Download Balrog dataset files"""
         self.source_path.mkdir(parents=True, exist_ok=True)
 
-        # Download trajectory file
-        if not (self.source_path / "minihack").exists():
-            self.logger.info("Downloading trajectory file for MiniHack-Balrog...")
-            raise NotImplementedError("Download not yet implemented")
+        # Download trajectory file if source path empty
+        if not os.listdir(self.source_path):
+            self.logger.info("Downloading trajectory file for Balrog...")
+            #owner: str, repo: str, path: str, save_path: str, token: str 
+            temp_owner = "sethimage"
+            temp_repo = "balrog-osw"
+            temp_path = "balrog/clean_results"
+
+            # TODO: Balrog conversion file to add turn folders to subtasks
+            # TODO: This assumes github token is set in environment --> if not, this needs to be added
+
+            # Files on github folder should exist as single block in a folder called 'balrog'
+            # Download CONTENTS of the folder, not the folder itself
+            # Format:
+            # - balrog
+            #   - minihack
+            #     - subtask_0
+            #       - turn_0
+            #   - babaisai
+            #     - subtask_0
+            #       - turn_0
+
+            download_github_folder(owner = temp_owner, repo = temp_repo, path = temp_path, save_path = self.source_path)
 
     def convert_to_dataset(self) -> None:
         """Convert Balrog data to osw dataset format"""
@@ -85,7 +104,7 @@ class BalrogConverter(BaseConverter):
             if task == "minihack":
                 self.source_path = self.source_path / task
             elif task == "babaisai":
-                self.source_path = self.source_path / task / 'env'
+                self.source_path = self.source_path / task
             else:
                 raise NotImplementedError(f"Task type {task} not currently supported")
 
@@ -116,12 +135,7 @@ class BalrogConverter(BaseConverter):
                         agent_id="agent",
                         agent_type="game_agent",
                         capabilities=["navigation", "interaction"]
-                    ),
-                    "user": AgentMetadata(
-                        agent_id="user",
-                        agent_type="human",
-                        capabilities=["instruction"],
-                    ),
+                    )
                 }
 
                 # Create instance metadata (this does not change within a subtask)
@@ -139,7 +153,7 @@ class BalrogConverter(BaseConverter):
 
                         # Convert to datetime by adding to now
                         step_id = line.split(",")[0] 
-                        step_id = ref_time + datetime.timedelta(seconds=int(step_id))
+                        step_id = ref_time + timedelta(seconds=int(step_id))
                         actions = line.split(",")[1]
                         reasoning = line.split(",")[2]
                         observations = line.split(",")[3]
