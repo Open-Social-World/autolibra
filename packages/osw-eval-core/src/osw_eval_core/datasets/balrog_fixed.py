@@ -77,21 +77,19 @@ class BalrogConverter(BaseConverter):
             temp_repo = "balrog-osw"
             temp_path = "balrog/clean_results"
 
-            # TODO: Balrog conversion file to add turn folders to subtasks
             # TODO: This assumes github token is set in environment --> if not, this needs to be added
+            # TODO: Handle turns
 
             # Files on github folder should exist as single block in a folder called 'balrog'
             # Download CONTENTS of the folder, not the folder itself
             # Format:
             # - balrog
-            #   - minihack
+            #   - minihack_turn_0
             #     - subtask_0
-            #       - turn_0
-            #   - babaisai
+            #   - babaisai_turn_0
             #     - subtask_0
-            #       - turn_0
 
-            download_github_folder(owner = temp_owner, repo = temp_repo, path = temp_path, save_path = self.source_path)
+            download_github_folder(owner = temp_owner, repo = temp_repo, path = temp_path, save_path = str(self.source_path))
 
     def convert_to_dataset(self) -> None:
         """Convert Balrog data to osw dataset format"""

@@ -12,6 +12,12 @@ For contributors, it is the best to use our shared data repo on huggingface: `op
 uv run python -m osw_eval_core.datasets.<dataset>
 ```
 
+Or run the following from the root of the repo:
+
+```bash
+uv run python -m packages.osw-eval-core.src.osw_eval_core.datasets.balrog_fixed
+```
+
 #### Download from huggingface
 
 ```bash
@@ -21,7 +27,7 @@ git clone https://huggingface.co/datasets/open-social-world/osw-eval .data
 #### Upload your data to huggingface
 
 ```bash
-# cd into .data
+# cd into .datauv run python -m osw_eval_core.datasets.<dataset>
 # git add your data
 # git commit -m "Add <dataset>"
 git push
