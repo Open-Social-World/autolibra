@@ -5,6 +5,12 @@ import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
+import csv
+import PIL.Image
+import numpy as np
+import ast
+import pickle as pkl
+import shutil
 
 import sys
 
@@ -12,7 +18,7 @@ import sys
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from osw_data.utils import download_github_folder, file_pairs
+from osw_data.utils import file_pairs
 
 class BalrogConverter(BaseConverter):
     """Handles downloading and converting Balrog data to our dataset format"""
@@ -69,27 +75,8 @@ class BalrogConverter(BaseConverter):
         """Download Balrog dataset files"""
         self.source_path.mkdir(parents=True, exist_ok=True)
 
-        # Download trajectory file if source path empty
-        if not os.listdir(self.source_path):
-            self.logger.info("Downloading trajectory file for Balrog...")
-            #owner: str, repo: str, path: str, save_path: str, token: str 
-            temp_owner = "sethimage"
-            temp_repo = "balrog-osw"
-            temp_path = "balrog/clean_results"
-
-            # TODO: This assumes github token is set in environment --> if not, this needs to be added
-            # TODO: Handle turns
-
-            # Files on github folder should exist as single block in a folder called 'balrog'
-            # Download CONTENTS of the folder, not the folder itself
-            # Format:
-            # - balrog
-            #   - minihack_turn_0
-            #     - subtask_0
-            #   - babaisai_turn_0
-            #     - subtask_0
-
-            download_github_folder(owner = temp_owner, repo = temp_repo, path = temp_path, save_path = str(self.source_path))
+        # This assumes that the trajectory file exists and the repo is in its most recent state,
+        # so this shouldn't ever be called
 
     def convert_to_dataset(self) -> None:
         """Convert Balrog data to osw dataset format"""
@@ -97,101 +84,117 @@ class BalrogConverter(BaseConverter):
 
         ref_time = datetime.now() # Used for step_id
 
-        # Iterate over task folders in source_path
-        for task in os.listdir(self.source_path):
-            if task == "minihack":
-                self.source_path = self.source_path / task
-            elif task == "babaisai":
-                self.source_path = self.source_path / task
-            else:
-                raise NotImplementedError(f"Task type {task} not currently supported")
+        # Obtain task from folder name
+        turn = self.source_path.name.split("_")[-1]
+        task = self.source_path.name.split("_")[0].split("-")[-1]
+        summary_path = self.source_path.with_name(self.source_path.name.replace(f"balrog-{task}", "balrog"))
+        # Capitalize first letter
+        task = task[0].upper() + task[1:]
 
-            # Initialize dataset
-            dataset = MultiAgentDataset(
-                name=f"{task}-Balrog",
-                base_path=self.output_path,
-                description=f"{task} trajectories from Balrog dataset",
-            )
+        # Initialize dataset
+        dataset = MultiAgentDataset(
+            name=f"{task}-Balrog",
+            base_path=self.output_path,
+            description=f"{task} trajectories from Balrog dataset",
+        )
 
-            summary_json = json.load(open(self.source_path / "summary.json"))
-            subtasks: list[str] = list(summary_json["tasks"].keys())
+        summary_json = json.load(open(summary_path / "summary.json"))
 
-            # Read trajectories (for given task type, exists n subdirs for task, each subdir has a trajectory file)
+        # Get list of all directories within self.source_path
+        subtasks: list[str] = [f.name for f in os.scandir(self.source_path) if f.is_dir()]
 
-            # Iterate over folders in task_dir
-            for subtask in subtasks:
-                subtask_dir = self.source_path / subtask
+        # Read trajectories (for given task type, exists n subdirs for task, each subdir has a trajectory file)
 
-                traj_file, json_file = file_pairs(subtask_dir)
+        # Iterate over folders in task_dir
+        for subtask in subtasks:
+            subtask_dir = self.source_path / subtask
 
-                # Load json file
-                json_file = json.load(open(subtask_dir / json_file))
 
-                # Create agent metadata (this does not change within a subtask)
-                agents_metadata = {
-                    "agent": AgentMetadata(
-                        agent_id="agent",
-                        agent_type="game_agent",
-                        capabilities=["navigation", "interaction"]
-                    )
+
+            # Get first pair of files in subtask_dir
+            traj_file, json_file = next(file_pairs(subtask_dir))
+
+            # Load json file
+            json_file = json.load(open(json_file))
+
+            # Create agent metadata (this does not change within a subtask)
+            agents_metadata = {
+                "agent": AgentMetadata(
+                    agent_id="agent",
+                    agent_type="game_agent",
+                    capabilities=["navigation", "interaction"]
+                )
+            }
+
+            # Create instance metadata (this does not change within a subtask)
+            instance_metadata={
+                "task": json_file["task"],
+                "source_model": json_file["client"]["model_id"],
                 }
 
-                # Create instance metadata (this does not change within a subtask)
-                instance_metadata={
-                    "task": json_file["task"],
-                    "source_model": json_file["client"]["model_id"],
+            instance_id = dataset.create_instance(
+                agents_metadata=agents_metadata,
+                instance_metadata=instance_metadata
+            )
+            print(f"Created instance {instance_id}")
+
+            gif_path = subtask_dir / "episode.gif"
+            # Copy gif to output path
+            gif_out_path = self.output_path / "instances" / instance_id / "episode.gif"
+            shutil.copy(gif_path, gif_out_path)
+
+            with open(traj_file, newline="") as f:
+                reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                # Skip header
+                next(reader)
+                for line in reader: # Format of Step,Action,Reasoning,Observation,Reward,Done
+                    line = [field.replace('\n', ' ').replace('\r', '') for field in line]
+
+                    # Convert to datetime by adding to now
+                    step_id = line[0] 
+                    step_id = ref_time + timedelta(seconds=int(step_id))
+                    actions = line[1]
+                    reasoning = line[2]
+                    observations = line[3]
+                    # Make new glyphs by running self.gm.glyph_id_to_rgb on each element of glyphs_raw in vectorized form
+                    # TODO: Figure if reasoning and observations should be added as separate data points
+                    
+                    # step_id should be the same to allow reconstruction of the trajectory, but if this
+                    # causes issues, should be fixed
+                    act_obj = {
+                        "reasoning": reasoning,
+                        "text": actions
                     }
 
-                instance_id = dataset.create_instance(
-                    agents_metadata=agents_metadata,
-                    instance_metadata=instance_metadata
-                )
-                with open(traj_file) as f:
-                    for line in f: # Format of Step,Action,Reasoning,Observation,Reward,Done
+                    obs_obj = {
+                        "observations": observations
+                    }
 
-                        # Convert to datetime by adding to now
-                        step_id = line.split(",")[0] 
-                        step_id = ref_time + timedelta(seconds=int(step_id))
-                        actions = line.split(",")[1]
-                        reasoning = line.split(",")[2]
-                        observations = line.split(",")[3]
-
-                        # TODO: Figure if reasoning and observations should be added as separate data points
-                        # step_id should be the same to allow reconstruction of the trajectory, but if this
-                        # causes issues, should be fixed
-                        act_obj = {
-                            "text": actions
-                        }
-
-                        obs_obj = {
-                            "reasoning": reasoning,
-                            "observations": observations
-                        }
-
-                        dataset.add_data_point(
-                                instance_id=instance_id,
-                                agent_id="agent",
-                                timestamp=step_id,
-                                point_type=PointType.OBSERVATION,
-                                data=obs_obj,
-                                media_type=MediaType.JSON,
-                            )
-
-                        dataset.add_data_point(
+                    dataset.add_data_point(
                             instance_id=instance_id,
                             agent_id="agent",
-                            timestamp=step_id, # Using step_id as timestamp
-                            point_type=PointType.ACTION,
-                            data=act_obj,
+                            timestamp=step_id,
+                            point_type=PointType.OBSERVATION,
+                            data=obs_obj,
                             media_type=MediaType.JSON,
                         )
 
-                self.logger.info(f"Dataset conversion complete for {task}")
-                dataset.close()
+                    dataset.add_data_point(
+                        instance_id=instance_id,
+                        agent_id="agent",
+                        timestamp=step_id, # Using step_id as timestamp
+                        point_type=PointType.ACTION,
+                        data=act_obj,
+                        media_type=MediaType.JSON,
+                    )
+
+
+            self.logger.info(f"Dataset conversion complete for {task}")
+            dataset.close()
 
 
 if __name__ == "__main__":
-    source_path = Path(".data/raw/balrog") # Handle all balrog data in one folder
-    output_path = Path(".data/balrog") # Handle all balrog data in one folder
+    source_path = Path(".data/raw/balrog-babaisai_turn_0") # Handle all balrog data in one folder
+    output_path = Path(".data/babaisai_turn_0") # Handle all balrog data in one folder
 
     run_converter(BalrogConverter, output_path, source_path)

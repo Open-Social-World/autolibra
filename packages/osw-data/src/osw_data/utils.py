@@ -93,6 +93,25 @@ def file_pairs(folder_path: str) -> Generator[Tuple[Path, Path], None, None]:
         if json_file.exists():
             yield csv_file, json_file
 
+def file_triplets(folder_path: str) -> Generator[Tuple[Path, Path, Path], None, None]:
+    """
+    Generate CSV and JSON, and PKL files with matching names from a folder.
+
+    Args:
+        folder_path: Path to the folder to search in
+
+    Yields:
+        Tuple of (csv_path, json_path, pkl_path) for matching files
+    """
+    path = Path(folder_path)
+
+    # Find all CSV files and check for JSON pairs
+    for csv_file in path.rglob("*.csv"):
+        json_file = csv_file.with_suffix(".json")
+        pkl_file = csv_file.with_suffix(".pkl")
+        if json_file.exists() and pkl_file.exists():
+            yield csv_file, json_file, pkl_file
+
 
 def parse_text_description(text_description: str) -> list[tuple[tuple[int, int], str]]:
     """

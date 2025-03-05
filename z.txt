@@ -1,0 +1,5 @@
+```bash
+uv run python -m packages.osw-eval-core.src.osw_eval_core.datasets.balrog_fixed
+```
+
+uv run python src/tty/tty_annotation.py .data/babaisai .data/annotations/babaisai --annotator-id Phil
