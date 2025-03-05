@@ -169,6 +169,13 @@ class MultiAgentDataset:
 
         with open(instance_path / "metadata.json", "r") as f:
             return DataInstance.model_validate_json(f.read())
+        
+    def update_instance_metadata(self, instance_id: str, new_meta: dict[str, Any]) -> None:
+        """Update metadata for a specific instance"""
+        inst = self.get_instance_metadata(instance_id)
+        inst.metadata.update(new_meta)
+        with open(self.instances_path / instance_id / "metadata.json", "w") as f:
+            f.write(inst.model_dump_json())
 
     def list_instances(self) -> list[str]:
         """list all instance IDs in the dataset"""

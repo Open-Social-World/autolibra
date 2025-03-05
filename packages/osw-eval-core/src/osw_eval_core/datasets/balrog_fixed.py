@@ -143,6 +143,10 @@ class BalrogConverter(BaseConverter):
             gif_out_path = self.output_path / "instances" / instance_id / "episode.gif"
             shutil.copy(gif_path, gif_out_path)
 
+            # Update instance_id with gif_path
+            add_gif = {'gif_path': gif_out_path}
+            dataset.update_instance_metadata(instance_id=instance_id, new_meta=add_gif)
+
             with open(traj_file, newline="") as f:
                 reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 # Skip header
@@ -194,6 +198,8 @@ class BalrogConverter(BaseConverter):
 
 
 if __name__ == "__main__":
+    # source_path = Path(".data/raw/balrog-minihack_turn_0") # Handle all balrog data in one folder
+    # output_path = Path(".data/minihack_turn_0") # Handle all balrog data in one folder
     source_path = Path(".data/raw/balrog-babaisai_turn_0") # Handle all balrog data in one folder
     output_path = Path(".data/babaisai_turn_0") # Handle all balrog data in one folder
 
