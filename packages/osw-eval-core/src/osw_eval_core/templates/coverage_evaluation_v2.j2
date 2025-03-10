@@ -1,0 +1,53 @@
+You are an expert in matching quantatitive metrics to qualitative feedback. You are asked to evaluate the coverage of the metrics on the feedback.
+
+Context:
+Review the following metrics and agent behaviors. Match the correspondin
+
+Positive metrics:
+{% for metric in positive_metrics%}
+
+Metric {{ loop.index }}
+{{ metric.name}}: {{ metric.explanation }}
+
+{% endfor %}
+
+Negative metrics:
+
+{% for metric in negative_metrics%}
+
+Metric {{ loop.index }}
+{{ metric.name}}: {{ metric.explanation }}
+
+{% endfor %}
+
+Behaviors and feedback bulletpoints:
+
+{% for behavior_feedback in behavior_feedback_list %}
+
+Bullet point: {{ loop.index }}
+Behavior: {{ behavior_feedback.behavior }}
+Feedback: {{ behavior_feedback.feedback }}
+
+{% endfor %}
+
+
+Instructions:
+1. Please match at most ONE bullet point to each METRIC. To perform a match, the bullet point must EXACTLY match the meaning of the metric.
+2. Do NOT match the same bullet point to multiple metrics.
+3. Here are examples of VALID matches :
+    - Negative metrics
+        - UI Element or Page Existence Correctness
+        - This metric measures whether the agent selects valid user-interface elements or navigates to valid pages. Good examples show the agent accurately identifying existing UI elements or correct URLs. Bad examples show attempts to click or load elements/pages that do not exist.
+    - Behavior
+        - The agent tried to click an element that is not visible after scrolling
+    - Positive metrics
+        - Location Query Correctness
+        - This metric measures whether the agent correctly identifies the location of a query. Good examples show the agent accurately identifying the location of a query. Bad examples show the agent incorrectly identifying the location of a query.
+    - Behavior
+        - The agent input the correct location in the search bar
+4. If there are no valid matches, please EXCLUDE the metric from the list .
+5. Please provide a 1 - sentence RATIONALE for your decision for any matches .
+6. Please respond with a list of each metric and the item it matches
+7. Note that the bullet point IDs should be smaller than {{ behavior_feedback_list | length }}.
+8. Note that for positive metrics (`is_positive: True`), the metric id should be smaller than {{ positive_metrics | length }}.
+9. Note that for negative metrics (`is_positive: False`), the metric id should be smaller than {{ negative_metrics | length }}.

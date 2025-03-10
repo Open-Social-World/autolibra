@@ -19,6 +19,13 @@ def load_template() -> jinja2.Template:
         return jinja2.Template(f.read())
 
 
+def load_renaming_template() -> jinja2.Template:
+    with resources.files("osw_eval_core.templates").joinpath(
+        "rename_proposed_metrics.j2"
+    ).open("r") as f:
+        return jinja2.Template(f.read())
+
+
 def render_webarena_trajectory(
     trajectory: SymmetricTrajectory, metadata: DataInstance | None = None
 ) -> str:
@@ -79,6 +86,50 @@ def get_metrics(dataset_path: Path, annotation_path: Path) -> list[Metric]:
 
     # Generate the metrics
     prompt = template.render(instances=instances)
+
+    model = VertexAIModel("gemini-2.0-flash-exp")
+    agent = Agent(model, result_type=list[Metric])
+
+    result = agent.run_sync(prompt)
+    return result.data
+
+
+class MetricTrainingInstance:
+    def __init__(
+        self, task: str, agent_id: str, trajectory: SymmetricTrajectory, feedback: str
+    ):
+        self.task = task
+        self.agent_id = agent_id
+        self.trajectory = trajectory
+        self.feedback = feedback
+
+
+def render_training_instance(training_instance: MetricTrainingInstance) -> str:
+    return "\n".join(
+        [
+            f"The task is {training_instance.task}",
+        ]
+        + [
+            f"{'Observation' if p.point_type == 'observation' else 'Action'}: {str(training_instance.trajectory.get_data_at(i))[:8000]}"
+            for i, p in enumerate(training_instance.trajectory.points)
+        ]
+    )
+
+
+def propose_metrics(instances: list[MetricTrainingInstance]) -> list[Metric]:
+    template = load_template()
+    prompt = template.render(
+        instances=[
+            dict(
+                trajectory=render_training_instance(training_instance),
+                feedback=training_instance.feedback,
+            )
+            for training_instance in instances
+        ]
+    )
+
+    with open("prompt.txt", "w") as f:
+        f.write(prompt)
 
     model = VertexAIModel("gemini-2.0-flash-exp")
     agent = Agent(model, result_type=list[Metric])

@@ -54,7 +54,11 @@ class MultiAgentDataset:
     """
 
     def __init__(
-        self, name: str, base_path: Path, description: str = "", version: str = "1.0"
+        self,
+        name: str,
+        base_path: Path | str,
+        description: str = "",
+        version: str = "1.0",
     ):
         self.base_path = Path(base_path)
         self.instances_path = self.base_path / "instances"

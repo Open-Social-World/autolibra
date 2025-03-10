@@ -1,0 +1,71 @@
+{
+  "bullet_points": [
+    {
+      "feedback": "Move down until you are in line with the door.",
+      "behavior": "The agent performed several 'down' actions that align with moving down towards the door.",
+      "is_positive": true
+    },
+    {
+      "feedback": "Move left into the door to win.",
+      "behavior": "The agent performed 'left' actions that oriented it in a leftward direction, potentially towards the door for reaching the endpoint.",
+      "is_positive": true
+    }
+  ]
+}
+{
+  "bullet_points": [
+    {
+      "feedback": "Move into the ball block from below.",
+      "behavior": "Agent should approach the ball block from below.",
+      "is_positive": false
+    },
+    {
+      "feedback": "Push the ball block upwards into the 'win' block.",
+      "behavior": "Agent should push the ball block up towards the 'win' block.",
+      "is_positive": false
+    },
+    {
+      "feedback": "Push the ball block left until it hits the left wall.",
+      "behavior": "Agent should move the ball block left to the left wall.",
+      "is_positive": false
+    },
+    {
+      "feedback": "Push the ball block upwards.",
+      "behavior": "Agent should push the ball block upwards.",
+      "is_positive": false
+    },
+    {
+      "feedback": "Touch the ball block.",
+      "behavior": "Agent should interact with or touch the ball block after positioning it.",
+      "is_positive": false
+    }
+  ]
+}
+{
+  "bullet_points": [
+    {
+      "feedback": "Remove 'stop' from wall is stop to stop the wall from blocking you.",
+      "behavior": "The agent should identify and perform the action to interact with the rule 'wall is stop' to remove the 'stop' rule.",
+      "is_positive": false
+    },
+    {
+      "feedback": "As soon as 'ball is win' is visible and complete, touch the ball by moving directly to it to win.",
+      "behavior": "The agent should move directly towards and touch the 'ball' after establishing the 'ball is win' rule.",
+      "is_positive": true
+    }
+  ]
+}
+{
+  "bullet_points": [
+    {
+      "feedback": "Move into the \"wall\", \"is\", or \"stop\" blocks to break the rule and allow you to cross the wall.",
+      "behavior": "Throughout the trajectory, the agent did not interact with the relevant rules on the board (wall, is, stop).",
+      "is_positive": false
+    },
+    {
+      "feedback": "Touch the key as \"key is win\" is the win condition",
+      "behavior": "The agent repeatedly moved around the cells without any interaction with the key or altering the rules.",
+      "is_positive": false
+    }
+  ]
+}

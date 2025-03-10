@@ -1,6 +1,6 @@
-Needed additional installs:
+Need additional installs:
 sudo apt-get install libgl1-mesa-glx
 sudo apt-get install unzip
 
 
-python3 download_boxoban_levels.py (In boboxan dir)
+python3 download_boxoban_levels.py for balrog directory (In boboxan dir)

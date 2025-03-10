@@ -1,5 +1,6 @@
 from importlib import resources
 import time
+from typing import Literal
 import jinja2
 from osw_data.annotation import AnnotationSystem
 from osw_data.dataset import MultiAgentDataset
@@ -7,13 +8,16 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 import pydantic_ai
 import pydantic_core
-from .generator import render_webarena_trajectory
+from .generator import MetricTrainingInstance, render_webarena_trajectory
 from pathlib import Path
 from osw_data import DataInstance, SymmetricTrajectory, Metric
 from abc import abstractmethod
 
 from pydantic_ai.models import Model
 from pydantic_ai.models.vertexai import VertexAIModel
+from openai import AzureOpenAI
+
+from ..configs import OSWEvalSettings
 
 
 class CoverageEvaluationResult(BaseModel):
@@ -22,8 +26,13 @@ class CoverageEvaluationResult(BaseModel):
 
 
 class EvaluationResult(BaseModel):
+    evaluation_metric_name: str
     reasoning: str
-    rating: int
+    rating: Literal["positive", "negative", "N/A"]
+
+
+class EvaluationResultArray(BaseModel):
+    results: list[EvaluationResult]
 
 
 class Evaluator(object):
@@ -43,6 +52,13 @@ class Evaluator(object):
 def _load_llm_as_a_judge_template() -> jinja2.Template:
     with resources.files("osw_eval_core.templates").joinpath(
         "llm_as_a_judge_evaluator.j2"
+    ).open("r") as f:
+        return jinja2.Template(f.read())
+
+
+def _load_llm_as_a_judge_v2_template() -> jinja2.Template:
+    with resources.files("osw_eval_core.templates").joinpath(
+        "llm_as_a_judge_evaluator_v2.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())
 
@@ -98,6 +114,60 @@ class LLMasaJudgeEvaluator(Evaluator):
                 print(f"Validation error: {e}")
 
         return result.data
+
+
+def llm_evaluation(
+    instances: list[MetricTrainingInstance], metrics: list[Metric]
+) -> list[list[EvaluationResult]]:
+    template = _load_llm_as_a_judge_v2_template()
+
+    eval_results: list[list[EvaluationResult]] = []
+
+    for instance in instances:
+        prompt = template.render(
+            instance=dict(
+                task_metadata=instance.task,
+                agent_metadata=instance.agent_id,
+                trajectory=render_webarena_trajectory(instance.trajectory),
+                feedback=instance.feedback,
+                metrics=[metric.model_dump() for metric in metrics],
+            )
+        )
+
+        settings = OSWEvalSettings()
+
+        client = AzureOpenAI(
+            api_key=settings.azure_api_key,
+            api_version="2024-10-21",
+            azure_endpoint=settings.azure_endpoint,
+        )
+
+        # wait_time = 1
+        while True:
+            # try:
+            result = client.beta.chat.completions.parse(
+                model=settings.azure_openai_4o_model,
+                messages=[
+                    {"role": "system", "content": "Following the user instruction."},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=EvaluationResultArray,
+            )
+
+            #     print(f"Model error: {e}")
+            #     time.sleep(wait_time)
+            #     wait_time *= 2
+            #     continue
+
+            # if len(result.data) == len(metrics):
+            break
+
+        if not result.choices[0].message.parsed:
+            raise ValueError("Failed to parse the response.")
+        else:
+            eval_results.append(result.choices[0].message.parsed.results)
+
+    return eval_results
 
 
 def evaluate_dataset_with_metrics(
