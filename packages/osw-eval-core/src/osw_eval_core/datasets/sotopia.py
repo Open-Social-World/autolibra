@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from osw_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from .base import BaseConverter, run_converter
 
-from huggingface_hub import hf_hub_download  # type:ignore[import-untyped]
+from huggingface_hub import hf_hub_download
 
 
 class TwoAgentEpisodeWithScenarioBackgroundGoals(BaseModel):

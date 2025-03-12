@@ -1335,7 +1335,6 @@ dependencies = [
     { name = "logfire" },
     { name = "osw-eval-core", extra = ["sotopia", "webarena"] },
     { name = "pandas" },
-    { name = "pandas-stubs" },
     { name = "pydantic-settings" },
     { name = "rich" },
     { name = "streamlit" },
@@ -1352,6 +1351,7 @@ notebook = [
 dev = [
     { name = "ipykernel" },
     { name = "mypy" },
+    { name = "pandas-stubs" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1364,11 +1364,10 @@ requires-dist = [
     { name = "logfire", specifier = ">=3.7.1" },
     { name = "marimo", marker = "extra == 'notebook'", specifier = ">=0.10" },
     { name = "osw-eval-core", extras = ["webarena", "sotopia"], editable = "packages/osw-eval-core" },
-    { name = "pandas" },
-    { name = "pandas-stubs" },
+    { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic-settings", specifier = ">=2.7.1" },
     { name = "rich", specifier = ">=13.9.4" },
-    { name = "streamlit" },
+    { name = "streamlit", specifier = ">=1.43" },
     { name = "typer", specifier = ">=0.15.1" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
@@ -1377,6 +1376,7 @@ requires-dist = [
 dev = [
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "mypy", specifier = ">=1.14.1" },
+    { name = "pandas-stubs", specifier = ">=2.2" },
     { name = "pre-commit", specifier = ">=4.0.1" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", specifier = ">=0.25.2" },

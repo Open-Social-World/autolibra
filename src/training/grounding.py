@@ -11,6 +11,7 @@
 
 import asyncio
 from datetime import datetime
+from openai import AsyncAzureOpenAI
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
 from osw_data.metrics import MetricSet
@@ -19,9 +20,18 @@ from osw_eval_core import (
     feedback_grounding,
     behavior_clustering,
 )
+from osw_eval_core.configs import OSWEvalSettings
 
 
 async def main(dataset_name: str) -> None:
+    settings = OSWEvalSettings()
+
+    client = AsyncAzureOpenAI(
+        api_key=settings.azure_api_key,
+        api_version="2024-12-01-preview",
+        azure_endpoint=settings.azure_endpoint,
+    )
+
     dataset = MultiAgentDataset(
         name="dataset",
         base_path=f".data/{dataset_name}",
@@ -52,7 +62,10 @@ async def main(dataset_name: str) -> None:
                 )
 
     feedback_grounding_results = await asyncio.gather(
-        *[feedback_grounding(instance) for instance in metric_training_instances]
+        *[
+            feedback_grounding(instance, client=client)
+            for instance in metric_training_instances
+        ]
     )
 
     with open("feedback_grounding_results.jsonl", "w") as f:
@@ -60,7 +73,17 @@ async def main(dataset_name: str) -> None:
             f.write(feedback_grounding_result.model_dump_json(indent=2))
             f.write("\n")
 
-    behavior_clustering_results = await behavior_clustering(feedback_grounding_results)
+    aspects = sum(
+        [
+            feedback_grounding_result.bullet_points
+            for feedback_grounding_result in feedback_grounding_results
+        ],
+        [],
+    )
+
+    behavior_clustering_results = await behavior_clustering(
+        aspects=aspects, client=client
+    )
 
     metric_set = MetricSet(
         name="Derived Metrics",
@@ -73,4 +96,4 @@ async def main(dataset_name: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main("sotopia"))
+    asyncio.run(main("cogym"))

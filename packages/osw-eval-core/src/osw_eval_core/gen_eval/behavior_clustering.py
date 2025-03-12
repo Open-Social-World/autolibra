@@ -3,7 +3,7 @@ import jinja2
 from openai import AsyncAzureOpenAI
 from osw_eval_core.configs import OSWEvalSettings
 from pydantic import BaseModel, ValidationError
-from .feedback_grounding import FeedbackGroundingOutput
+from .feedback_grounding import Aspect
 from osw_data import Metric
 
 
@@ -19,36 +19,28 @@ class BehaviorClusteringOutput(BaseModel):
 
 
 async def behavior_clustering(
-    feedback_grounding_results: list[FeedbackGroundingOutput],
+    aspects: list[Aspect],
+    client: AsyncAzureOpenAI,
 ) -> BehaviorClusteringOutput:
-    behavior_feedback_list = sum(
-        (output.bullet_points for output in feedback_grounding_results), []
-    )
-
     prompt = _load_behavior_clustering_template().render(
-        behavior_feedback_list=behavior_feedback_list,
+        behavior_feedback_list=aspects,
     )
 
     settings = OSWEvalSettings()
 
-    client = AsyncAzureOpenAI(
-        api_key=settings.azure_api_key,
-        api_version="2024-12-01-preview",
-        azure_endpoint=settings.azure_endpoint,
-    )
-
-    assert settings.azure_openai_o3_model is not None
+    model = settings.azure_openai_o3_model
+    assert model is not None
 
     while True:
         try:
             completion = await client.beta.chat.completions.parse(
-                model=settings.azure_openai_o3_model,
-                reasoning_effort="high",
+                model=model,
                 messages=[
                     # {"role": "system", "content": "Cluster the behaviors."},
                     {"role": "user", "content": prompt},
                 ],
                 response_format=BehaviorClusteringOutput,
+                reasoning_effort="high",
             )
             break
         except ValidationError as e:

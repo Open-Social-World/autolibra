@@ -1,5 +1,4 @@
 from .gen_eval import (
-    propose_metrics,
     MetricTrainingInstance,
     llm_evaluation,
     feedback_grounding,
@@ -10,7 +9,6 @@ from .evaluators import run_llm_eval
 # coverage_eval
 
 __all__ = [
-    "propose_metrics",
     "MetricTrainingInstance",
     "llm_evaluation",
     "feedback_grounding",

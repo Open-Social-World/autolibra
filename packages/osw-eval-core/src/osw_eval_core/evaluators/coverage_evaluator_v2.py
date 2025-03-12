@@ -3,13 +3,15 @@ from importlib import resources
 import pickle
 from typing import Any, Literal
 import jinja2
+import logfire
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
 from osw_eval_core.gen_eval.generator import MetricTrainingInstance
-from ..gen_eval.feedback_grounding import BehavirorFeedback, feedback_grounding
-from pydantic import BaseModel, ValidationError, create_model, Field
+from ..gen_eval.feedback_grounding import Aspect, feedback_grounding
+from pydantic import BaseModel, Field, ValidationError, create_model
+from pydantic.fields import FieldInfo
 
 
 def _load_template() -> jinja2.Template:
@@ -33,7 +35,7 @@ def sanitize_string(s: str) -> str:
 
 
 def create_aspect_traits_match_json_schema(
-    aspects: list[BehavirorFeedback], traits: list[Metric]
+    aspects: list[Aspect], traits: list[Metric]
 ) -> dict[str, Any]:
     # First, let's prepare the traits tuple once since it's the same for all trait fields
     trait_options = [
@@ -44,7 +46,7 @@ def create_aspect_traits_match_json_schema(
     ]
 
     # Create fields for aspects and traits
-    schema = {}
+    schema: dict[str, Any] = {}
     schema["properties"] = {}
     for i in range(len(aspects)):
         # Combine behavior and feedback with properly escaped strings
@@ -73,11 +75,11 @@ def create_aspect_traits_match_json_schema(
 
 
 async def create_aspect_traits_match_pydantic_model(
-    aspects: list[BehavirorFeedback], traits: list[Metric]
-) -> BaseModel:
-    fields: dict[str, tuple[type[Literal[str]], Field]] = {}
+    aspects: list[Aspect], traits: list[Metric]
+) -> type[BaseModel]:
+    fields: dict[str, tuple[type[Literal[str]], FieldInfo]] = {}  # type: ignore[valid-type]
     for i in range(len(aspects)):
-        fields[f"aspect_{i}"] = (
+        fields[f"aspect_{i}"] = (  # type: ignore[assignment]
             Literal[
                 sanitize_string(aspects[i].feedback)
                 + ": "
@@ -86,7 +88,7 @@ async def create_aspect_traits_match_pydantic_model(
             Field(title=f"Aspect {i}"),
         )
 
-        fields[f"trait_{i}"] = (
+        fields[f"trait_{i}"] = (  # type: ignore[assignment]
             Literal[
                 tuple(
                     sanitize_string(trait.name)
@@ -99,56 +101,73 @@ async def create_aspect_traits_match_pydantic_model(
             Field(title=f"Trait {i}"),
         )
 
-    return create_model("AspectTraitsMatch", **fields)
+    return create_model("AspectTraitsMatch", **fields)  # type: ignore[no-any-return, call-overload]
 
 
 async def match_aspects_and_traits(
-    client: AsyncAzureOpenAI, aspects: list[BehavirorFeedback], traits: list[Metric]
-) -> BaseModel:
+    client: AsyncAzureOpenAI, aspects: list[Aspect], traits: list[Metric]
+) -> dict[str, str]:
     settings = OSWEvalSettings()
-    aspect_traits_model = await create_aspect_traits_match_pydantic_model(
-        aspects, traits
-    )
+    results: list[BaseModel] = []
+    for aspect in aspects:
+        aspect_traits_model = await create_aspect_traits_match_pydantic_model(
+            [aspect], traits
+        )
 
-    template = _load_template()
-    prompt = template.render(
-        aspects=aspects,
-        traits=traits,
-    )
+        template = _load_template()
+        prompt = template.render(
+            aspects=[aspect],
+            traits=traits,
+        )
 
-    while True:
-        wait_time = 1
-        try:
-            completion = await client.beta.chat.completions.parse(
-                model=settings.azure_openai_4o_model,
-                messages=[
-                    {"role": "system", "content": "Match the aspects with the traits."},
-                    {"role": "user", "content": prompt},
-                ],
-                response_format=aspect_traits_model,
-            )
-            break
-        except ValidationError as e:
-            print(e)
-            print(aspect_traits_model.model_json_schema())
-        except RateLimitError as e:
-            print(e)
-            wait_time *= 2
-            await asyncio.sleep(wait_time)
-        except openai.BadRequestError as e:
-            print(aspect_traits_model.model_json_schema())
-            print(e)
-            raise e
+        model = settings.azure_openai_4o_model
+        assert model
 
-    return completion.choices[0].message.parsed
+        while True:
+            wait_time = 1
+            try:
+                completion = await client.beta.chat.completions.parse(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Match the aspects with the traits.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format=aspect_traits_model,
+                )
+                break
+            except ValidationError as e:
+                print(e)
+                print(aspect_traits_model.model_json_schema())
+            except RateLimitError as e:
+                print(e)
+                wait_time *= 2
+                await asyncio.sleep(wait_time)
+            except openai.BadRequestError as e:
+                print(aspect_traits_model.model_json_schema())
+                logfire.warning(f"Schema error: {e}")
+                raise e
+
+        result_or_none = completion.choices[0].message.parsed
+        assert result_or_none and isinstance(result_or_none, aspect_traits_model)
+        results.append(result_or_none)
+
+    result_dict: dict[str, str] = {}
+    for i, result in enumerate(results):
+        result_dict[f"aspect_{i}"] = result.model_dump()["aspect_0"]
+        result_dict[f"trait_{i}"] = result.model_dump()["trait_0"]
+
+    return result_dict
 
 
 async def run_instance_coverage_eval(
     client: AsyncAzureOpenAI,
-    aspects: list[BehavirorFeedback],
+    aspects: list[Aspect],
     traits: list[Metric],
     ratings: list[int],
-) -> tuple[int, int, int, int, list[BehavirorFeedback]]:
+) -> tuple[int, int, int, int, list[Aspect]]:
     positive_aspects = [aspect for aspect in aspects if aspect.is_positive]
     negative_aspects = [aspect for aspect in aspects if not aspect.is_positive]
     positive_traits = [trait for (trait, rating) in zip(traits, ratings) if rating == 1]
@@ -175,11 +194,11 @@ async def run_instance_coverage_eval(
 
     number_of_total_aspects = len(aspects)
     number_of_not_matched_aspects = 0
-    unmatch_aspects: list[BehavirorFeedback] = []
+    unmatch_aspects: list[Aspect] = []
 
     for i in range(len(positive_aspects)):
         if (
-            positive_match_results.model_dump()[f"trait_{i}"]
+            positive_match_results[f"trait_{i}"]
             == "None of the traits matches the aspect."
         ):
             number_of_not_matched_aspects += 1
@@ -187,7 +206,7 @@ async def run_instance_coverage_eval(
 
     for i in range(len(negative_aspects)):
         if (
-            negative_match_results.model_dump()[f"trait_{i}"]
+            negative_match_results[f"trait_{i}"]
             == "None of the traits matches the aspect."
         ):
             number_of_not_matched_aspects += 1
@@ -197,17 +216,17 @@ async def run_instance_coverage_eval(
 
     for i in range(len(positive_aspects)):
         if (
-            positive_match_results.model_dump()[f"trait_{i}"]
+            positive_match_results[f"trait_{i}"]
             != "None of the traits matches the aspect."
         ):
-            used_traits.add(positive_match_results.model_dump()[f"trait_{i}"])
+            used_traits.add(positive_match_results[f"trait_{i}"])
 
     for i in range(len(negative_aspects)):
         if (
-            negative_match_results.model_dump()[f"trait_{i}"]
+            negative_match_results[f"trait_{i}"]
             != "None of the traits matches the aspect."
         ):
-            used_traits.add(negative_match_results.model_dump()[f"trait_{i}"])
+            used_traits.add(negative_match_results[f"trait_{i}"])
 
     return (
         number_of_total_aspects - number_of_not_matched_aspects,
@@ -222,17 +241,10 @@ async def run_coverage_eval(
     metrics: list[Metric],
     metric_scoring: list[list[int]],
     instances: list[MetricTrainingInstance],
-):
-    settings = OSWEvalSettings()
-
-    client = AsyncAzureOpenAI(
-        api_key=settings.azure_api_key,
-        api_version="2024-10-21",
-        azure_endpoint=settings.azure_endpoint,
-    )
-
+    client: AsyncAzureOpenAI,
+) -> list[tuple[int, int, int, int, list[Aspect]]]:
     feedback_grounding_results = await asyncio.gather(
-        *[feedback_grounding(instance) for instance in instances]
+        *[feedback_grounding(instance, client) for instance in instances]
     )
 
     coverage_results = await asyncio.gather(

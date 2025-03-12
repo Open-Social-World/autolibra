@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -10,3 +11,4 @@ class OSWEvalSettings(BaseSettings):
     azure_openai_4o_model: str | None = Field(default=None)
     azure_openai_o1_model: str | None = Field(default=None)
     azure_openai_o3_model: str | None = Field(default=None)
+    reasoning_effort: Literal["low", "medium", "high"] = "medium"

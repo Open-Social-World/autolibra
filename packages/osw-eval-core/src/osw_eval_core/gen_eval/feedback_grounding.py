@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from .generator import render_training_instance, MetricTrainingInstance
 
 
-class BehavirorFeedback(BaseModel):
+class Aspect(BaseModel):
     feedback: str
     behavior: str
     is_positive: bool = Field(
@@ -16,7 +16,7 @@ class BehavirorFeedback(BaseModel):
 
 
 class FeedbackGroundingOutput(BaseModel):
-    bullet_points: list[BehavirorFeedback]
+    bullet_points: list[Aspect]
 
 
 def _load_feedback_grounding_template() -> jinja2.Template:
@@ -28,14 +28,9 @@ def _load_feedback_grounding_template() -> jinja2.Template:
 
 async def feedback_grounding(
     instance: MetricTrainingInstance,
+    client: AsyncAzureOpenAI,
 ) -> FeedbackGroundingOutput:
     settings = OSWEvalSettings()
-
-    client = AsyncAzureOpenAI(
-        api_key=settings.azure_api_key,
-        api_version="2024-10-21",
-        azure_endpoint=settings.azure_endpoint,
-    )
 
     template = _load_feedback_grounding_template()
 
@@ -45,11 +40,14 @@ async def feedback_grounding(
         )
     )
 
+    model = settings.azure_openai_4o_model
+    assert model
+
     wait_time = 1
     while True:
         try:
             completion = await client.beta.chat.completions.parse(
-                model=settings.azure_openai_4o_model,
+                model=model,
                 messages=[
                     {
                         "role": "system",

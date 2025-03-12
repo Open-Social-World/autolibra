@@ -15,7 +15,7 @@ from abc import abstractmethod
 
 from pydantic_ai.models import Model
 from pydantic_ai.models.vertexai import VertexAIModel
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 
 from ..configs import OSWEvalSettings
 
@@ -116,8 +116,10 @@ class LLMasaJudgeEvaluator(Evaluator):
         return result.data
 
 
-def llm_evaluation(
-    instances: list[MetricTrainingInstance], metrics: list[Metric]
+async def llm_evaluation(
+    instances: list[MetricTrainingInstance],
+    metrics: list[Metric],
+    client: AsyncAzureOpenAI,
 ) -> list[list[EvaluationResult]]:
     template = _load_llm_as_a_judge_v2_template()
 
@@ -136,17 +138,14 @@ def llm_evaluation(
 
         settings = OSWEvalSettings()
 
-        client = AzureOpenAI(
-            api_key=settings.azure_api_key,
-            api_version="2024-10-21",
-            azure_endpoint=settings.azure_endpoint,
-        )
+        model = settings.azure_openai_4o_model
+        assert model
 
         # wait_time = 1
         while True:
             # try:
-            result = client.beta.chat.completions.parse(
-                model=settings.azure_openai_4o_model,
+            result = await client.beta.chat.completions.parse(
+                model=model,
                 messages=[
                     {"role": "system", "content": "Following the user instruction."},
                     {"role": "user", "content": prompt},
