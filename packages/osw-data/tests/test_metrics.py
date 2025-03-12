@@ -53,7 +53,7 @@ class TestMetricSetInitialization:
 
         assert ms.base_path == tmp_path
         assert ms.metrics_path == tmp_path / "metrics"
-        assert ms.metadata_path == tmp_path / "metadata.yaml"
+        assert ms.metadata_path == tmp_path / "metadata.json"
         assert ms.metrics_path.exists()
         assert ms.base_path.exists()
 
@@ -66,10 +66,23 @@ class TestMetricSetInitialization:
             induced_from="source",
             version="1.0",
         )
-        metadata_path = tmp_path / "metadata.yaml"
+        metadata_path = tmp_path / "metadata.json"
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
         with open(metadata_path, "w") as f:
             f.write(metadata.model_dump_json(indent=2))
+
+        metric1 = Metric(
+            name="metric1",
+            explanation="First test metric",
+            good_behaviors=["good1"],
+            bad_behaviors=["bad1"],
+        )
+
+        # Create existing metric file
+        metric_path = tmp_path / "metrics" / "metric1.json"
+        metric_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(metric_path, "w") as f:
+            f.write(metric1.model_dump_json(indent=2))
 
         # Initialize MetricSet with existing metadata
         ms = MetricSet(name="new_name", base_path=tmp_path, induced_from="new_source")
@@ -80,7 +93,7 @@ class TestMetricSetInitialization:
 
     def test_initialization_with_invalid_metadata(self, tmp_path: Path) -> None:
         """Test initialization with corrupted metadata file"""
-        metadata_path = tmp_path / "metadata.yaml"
+        metadata_path = tmp_path / "metadata.json"
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
         with open(metadata_path, "w") as f:
             f.write("invalid json")
@@ -101,7 +114,7 @@ class TestMetricOperations:
         assert metric_set.metrics[sample_metric.name] == sample_metric
 
         # Check if metric file was created
-        metric_path = metric_set.metrics_path / f"{sample_metric.name}.yaml"
+        metric_path = metric_set.metrics_path / f"{sample_metric.name}.json"
         assert metric_path.exists()
 
     def test_add_multiple_metrics(
@@ -112,7 +125,7 @@ class TestMetricOperations:
 
         for metric in sample_metrics:
             assert metric.name in metric_set.metrics
-            metric_path = metric_set.metrics_path / f"{metric.name}.yaml"
+            metric_path = metric_set.metrics_path / f"{metric.name}.json"
             assert metric_path.exists()
 
     def test_add_duplicate_metric(
@@ -149,7 +162,7 @@ class TestMetricOperations:
         metric_set.add_metrics([sample_metric])
 
         # Corrupt the metric file
-        metric_path = metric_set.metrics_path / f"{sample_metric.name}.yaml"
+        metric_path = metric_set.metrics_path / f"{sample_metric.name}.json"
         with open(metric_path, "w") as f:
             f.write("invalid json")
 
@@ -183,7 +196,7 @@ class TestMetadataOperations:
         metric_set._save_metrics()
 
         for metric in sample_metrics:
-            metric_path = metric_set.metrics_path / f"{metric.name}.yaml"
+            metric_path = metric_set.metrics_path / f"{metric.name}.json"
             assert metric_path.exists()
 
             with open(metric_path, "r") as f:

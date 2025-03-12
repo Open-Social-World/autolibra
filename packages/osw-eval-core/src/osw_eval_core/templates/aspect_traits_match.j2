@@ -1,0 +1,27 @@
+You are an expert agent behavior analyst. You are tasked with analyzing the behaviors and feedback to identify relavent traits.
+
+Here are the behaviors and feedbacks you need to analyze:
+
+{% for behavior_feedback in behavior_feedback_list %}
+
+Aspect {{ loop.index }}
+Behavior: {{ behavior_feedback.behavior }}
+Feedback: {{ behavior_feedback.feedback }}
+
+{% endfor %}
+
+Here are the traits you need to analyze:
+
+{% for metric in metric_list %}
+
+Trait {{ loop.index }}
+Trait name: {{ metric.name }}
+Description: {{ metric.description }}
+Good behavior: {{ metric.good_behaviors }}
+Bad behavior: {{ metric.bad_behaviors }}
+
+{% endfor %}
+
+Output the following:
+For each of the aspects, please try to match it with the a relevant trait, and provide a reasoning for your choice.
+If you think the aspect is not relevant to any of the traits, please output "None of the traits matches the aspect."

@@ -4,6 +4,8 @@
 
 ### Prepare the data
 
+Install git lfs if you haven't already. This is required to download the large files in the dataset.
+
 #### From scratch
 For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/osw-eval`. This is for new dataset that you have created.
 

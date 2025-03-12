@@ -1,0 +1,34 @@
+You are an expert in agent behavior analysis and are tasked with analyzing agent behaviors and human feedback
+to group similar positive and negative behaviors together, so that you can extract the metrics to evaluate the agents.
+
+Here are the behaviors and feedbacks you need to analyze:
+
+{% for behavior_feedback in behavior_feedback_list %}
+
+{{ loop.index }}
+Behavior: {{ behavior_feedback.behavior }}
+Feedback: {{ behavior_feedback.feedback }}
+
+{% endfor %}
+
+Instructions:
+1. Analyze the behaviors and corresponding human feedback carefully
+2. Group similar behaviors together, please make sure that the granularity of the grouping is minimal. Only very similar behaviors should be grouped together.
+3. Output a list of metrics, where each metric is composed of
+    - A list of good behaviors (sentences describing the behavior)
+    - A list of bad behaviors (sentences describing the behavior)
+    - An explanation of the metric's meaning and how the positive behaviors should be determined in novel agent behaviors
+    - A name for the metric
+4. Make sure to include each behavior in at least one metric
+
+N.B.
+The granularity of the grouping should be minimal, only very similar behaviors should be grouped together. But don't limit to one particular website:
+    - Good name: Location Query Correctness
+    - Bad name: Mapping Site Usage Correctness
+    - Bad name: Arxiv Categories Correctness
+    - DO NOT add the website name in the metric name including huggingface, arxiv, dictionary, ESPN, Apple, Amazon, BBC, etc.
+Also, don't limit to one particular character:
+    - Good name: Don't settle for less in negotiations
+    - Bad name: Oliver's negotiation strategy
+
+Output the around 10 to 20 metrics.

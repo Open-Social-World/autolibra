@@ -68,8 +68,8 @@ class AnnotationSystem:
 
     def __init__(
         self,
-        base_path: Path,
-        project_name: str,
+        base_path: Path | str,
+        project_name: str | None = None,
         description: str = "",
         annotation_schema: Optional[dict[str, Any]] = None,
     ):
@@ -88,7 +88,7 @@ class AnnotationSystem:
 
     def _init_project(
         self,
-        name: str,
+        name: str | None,
         description: str,
         annotation_schema: dict[str, Any],
     ) -> AnnotationProject:
@@ -98,6 +98,8 @@ class AnnotationSystem:
                 project_dict = yaml.safe_load(f)
                 return AnnotationProject(**project_dict)
         else:
+            if not name:
+                raise ValueError("Project name is required")
             project = AnnotationProject(
                 project_id=str(uuid4()),
                 name=name,
@@ -244,5 +246,19 @@ class AnnotationSystem:
                 if time_anns:
                     key = f"{trajectory_annotations.instance_id}_{trajectory_annotations.agent_id}"
                     annotations[key] = time_anns
+
+        return annotations
+
+    def get_all_annotations(self) -> dict[str, list[Annotation]]:
+        """Get all annotations"""
+        annotations = {}
+        for annotation_file in self.annotations_path.glob("*.json"):
+            with open(annotation_file, "r") as f:
+                trajectory_annotations = TrajectoryAnnotations.model_validate_json(
+                    f.read()
+                )
+
+                key = f"{trajectory_annotations.instance_id}_{trajectory_annotations.agent_id}"
+                annotations[key] = trajectory_annotations.annotations
 
         return annotations
