@@ -18,7 +18,7 @@ import sys
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from osw_data.utils import file_pairs
+from osw_data.utils import file_pairs, file_pairs_list
 
 class BalrogConverter(BaseConverter):
     """Handles downloading and converting Balrog data to our dataset format"""
@@ -109,88 +109,90 @@ class BalrogConverter(BaseConverter):
         for subtask in subtasks:
             subtask_dir = self.source_path / subtask
 
+            fpl = file_pairs_list(subtask_dir)
 
+            for traj_file, json_file in fpl:
+                # Get pair of files in subtask_dir
+                episode_number = str(str(json_file).split("_")[-1].split('.')[0])
 
-            # Get first pair of files in subtask_dir
-            traj_file, json_file = next(file_pairs(subtask_dir))
+                # Load json file
+                json_file = json.load(open(json_file))
 
-            # Load json file
-            json_file = json.load(open(json_file))
-
-            # Create agent metadata (this does not change within a subtask)
-            agents_metadata = {
-                "agent": AgentMetadata(
-                    agent_id="agent",
-                    agent_type="game_agent",
-                    capabilities=["navigation", "interaction"]
-                )
-            }
-
-            # Create instance metadata (this does not change within a subtask)
-            instance_metadata={
-                "task": json_file["task"],
-                "source_model": json_file["client"]["model_id"],
+                # Create agent metadata (this does not change within a subtask)
+                agents_metadata = {
+                    "agent": AgentMetadata(
+                        agent_id="agent",
+                        agent_type="game_agent",
+                        capabilities=["navigation", "interaction"]
+                    )
                 }
 
-            instance_id = dataset.create_instance(
-                agents_metadata=agents_metadata,
-                instance_metadata=instance_metadata
-            )
-            print(f"Created instance {instance_id}")
-
-            gif_path = subtask_dir / "episode.gif"
-            # Copy gif to output path
-            gif_out_path = self.output_path / "instances" / instance_id / "episode.gif"
-            shutil.copy(gif_path, gif_out_path)
-
-            # Update instance_id with gif_path
-            add_gif = {'gif_path': gif_out_path}
-            dataset.update_instance_metadata(instance_id=instance_id, new_meta=add_gif)
-
-            with open(traj_file, newline="") as f:
-                reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
-                # Skip header
-                next(reader)
-                for line in reader: # Format of Step,Action,Reasoning,Observation,Reward,Done
-                    line = [field.replace('\n', ' ').replace('\r', '') for field in line]
-
-                    # Convert to datetime by adding to now
-                    step_id = line[0] 
-                    step_id = ref_time + timedelta(seconds=int(step_id))
-                    actions = line[1]
-                    reasoning = line[2]
-                    observations = line[3]
-                    # Make new glyphs by running self.gm.glyph_id_to_rgb on each element of glyphs_raw in vectorized form
-                    # TODO: Figure if reasoning and observations should be added as separate data points
-                    
-                    # step_id should be the same to allow reconstruction of the trajectory, but if this
-                    # causes issues, should be fixed
-                    act_obj = {
-                        "reasoning": reasoning,
-                        "text": actions
+                # Create instance metadata (this does not change within a subtask)
+                instance_metadata={
+                    "task": json_file["task"],
+                    "source_model": json_file["client"]["model_id"],
                     }
 
-                    obs_obj = {
-                        "observations": observations
-                    }
+                instance_id = dataset.create_instance(
+                    agents_metadata=agents_metadata,
+                    instance_metadata=instance_metadata
+                )
+                print(f"Created instance {instance_id}")
 
-                    dataset.add_data_point(
+
+                gif_path = subtask_dir / f"episode_{episode_number}.gif"
+                # Copy gif to output path
+                gif_out_path = self.output_path / "instances" / instance_id / f"episode_{episode_number}.gif"
+                shutil.copy(gif_path, gif_out_path)
+
+                # Update instance_id with gif_path
+                add_gif = {'gif_path': gif_out_path}
+                dataset.update_instance_metadata(instance_id=instance_id, new_meta=add_gif)
+
+                with open(traj_file, newline="") as f:
+                    reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                    # Skip header
+                    next(reader)
+                    for line in reader: # Format of Step,Action,Reasoning,Observation,Reward,Done
+                        line = [field.replace('\n', ' ').replace('\r', '') for field in line]
+
+                        # Convert to datetime by adding to now
+                        step_id = line[0] 
+                        step_id = ref_time + timedelta(seconds=int(step_id))
+                        actions = line[1]
+                        reasoning = line[2]
+                        observations = line[3]
+                        # Make new glyphs by running self.gm.glyph_id_to_rgb on each element of glyphs_raw in vectorized form
+                        # TODO: Figure if reasoning and observations should be added as separate data points
+                        
+                        # step_id should be the same to allow reconstruction of the trajectory, but if this
+                        # causes issues, should be fixed
+                        act_obj = {
+                            "reasoning": reasoning,
+                            "text": actions
+                        }
+
+                        obs_obj = {
+                            "observations": observations
+                        }
+
+                        dataset.add_data_point(
+                                instance_id=instance_id,
+                                agent_id="agent",
+                                timestamp=step_id,
+                                point_type=PointType.OBSERVATION,
+                                data=obs_obj,
+                                media_type=MediaType.JSON,
+                            )
+
+                        dataset.add_data_point(
                             instance_id=instance_id,
                             agent_id="agent",
-                            timestamp=step_id,
-                            point_type=PointType.OBSERVATION,
-                            data=obs_obj,
+                            timestamp=step_id, # Using step_id as timestamp
+                            point_type=PointType.ACTION,
+                            data=act_obj,
                             media_type=MediaType.JSON,
                         )
-
-                    dataset.add_data_point(
-                        instance_id=instance_id,
-                        agent_id="agent",
-                        timestamp=step_id, # Using step_id as timestamp
-                        point_type=PointType.ACTION,
-                        data=act_obj,
-                        media_type=MediaType.JSON,
-                    )
 
 
             self.logger.info(f"Dataset conversion complete for {task}")

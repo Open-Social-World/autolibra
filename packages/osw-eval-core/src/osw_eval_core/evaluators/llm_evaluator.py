@@ -64,7 +64,7 @@ async def eval_instance(
             wait_time = 1
             try:
                 completion = await client.beta.chat.completions.parse(
-                    model=settings.azure_openai_4o_model,
+                    model=settings.azure_openai_o3_model,
                     messages=[
                         {"role": "system", "content": "Evaluate the trajectory."},
                         {"role": "user", "content": prompt},
@@ -95,7 +95,7 @@ async def run_llm_eval(
 
     client = AsyncAzureOpenAI(
         api_key=settings.azure_api_key,
-        api_version="2024-10-21",
+        api_version="2024-12-01-preview",
         azure_endpoint=settings.azure_endpoint,
     )
 

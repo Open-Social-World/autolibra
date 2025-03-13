@@ -27,9 +27,7 @@ For BALROG-osw-eval, an entire pipeline (turn) proceeds as follows:
     a. Run the following line, ensuring the target file is set correctly (changes every turn):
     `uv run python -m src.training.grounding`
 
-4. Run LLM Eval to get coverage.
+4. Run LLM Eval to get coverage and eval results.
     a. Run the following line, ensuring that the dataset name and metric path are used in the `llm_eval.py` file:
-    `uv run python -m osw_eval_core.gen_eval.llm_eval`
-
-5. Convert the results into parsable json and
+    `uv run python -m src.training.llm_eval`
     
