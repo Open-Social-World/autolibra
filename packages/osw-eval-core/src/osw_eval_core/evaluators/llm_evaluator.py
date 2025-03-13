@@ -4,10 +4,8 @@ import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.gen_eval.generator import (
-    MetricTrainingInstance,
-    render_training_instance,
-)
+from ..data import MetricTrainingInstance
+from ..utils import render_training_instance
 from pydantic import BaseModel, ValidationError, create_model, Field
 from typing import Literal
 

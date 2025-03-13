@@ -2,7 +2,7 @@ from osw_data import AnnotationSystem
 import rich
 
 if __name__ == "__main__":
-    dataset_name = "cogym"
+    dataset_name = "sotopia"
 
     annotation_system = AnnotationSystem(
         base_path=f".data/annotations/{dataset_name}",

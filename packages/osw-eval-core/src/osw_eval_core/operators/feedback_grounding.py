@@ -3,16 +3,9 @@ from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 from osw_eval_core.configs import OSWEvalSettings
-from pydantic import BaseModel, Field
-from .generator import render_training_instance, MetricTrainingInstance
-
-
-class Aspect(BaseModel):
-    feedback: str
-    behavior: str
-    is_positive: bool = Field(
-        description="Whether the feedback is positive or negative."
-    )
+from pydantic import BaseModel
+from ..utils import render_training_instance
+from ..data import MetricTrainingInstance, Aspect
 
 
 class FeedbackGroundingOutput(BaseModel):
@@ -29,7 +22,7 @@ def _load_feedback_grounding_template() -> jinja2.Template:
 async def feedback_grounding(
     instance: MetricTrainingInstance,
     client: AsyncAzureOpenAI,
-) -> FeedbackGroundingOutput:
+) -> list[Aspect]:
     settings = OSWEvalSettings()
 
     template = _load_feedback_grounding_template()
@@ -66,4 +59,4 @@ async def feedback_grounding(
     if not completion.choices[0].message.parsed:
         raise ValueError("Failed to parse the response.")
     else:
-        return completion.choices[0].message.parsed
+        return completion.choices[0].message.parsed.bullet_points

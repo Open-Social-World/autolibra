@@ -70,12 +70,14 @@ async def main(dataset_name: str) -> None:
 
     with open("feedback_grounding_results.jsonl", "w") as f:
         for feedback_grounding_result in feedback_grounding_results:
-            f.write(feedback_grounding_result.model_dump_json(indent=2))
+            for aspect in feedback_grounding_result:
+                f.write(aspect.model_dump_json(indent=2))
+                f.write("\n")
             f.write("\n")
 
     aspects = sum(
         [
-            feedback_grounding_result.bullet_points
+            feedback_grounding_result
             for feedback_grounding_result in feedback_grounding_results
         ],
         [],

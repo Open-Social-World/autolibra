@@ -3,7 +3,7 @@ import jinja2
 from openai import AsyncAzureOpenAI
 from osw_eval_core.configs import OSWEvalSettings
 from pydantic import BaseModel, ValidationError
-from .feedback_grounding import Aspect
+from ..data import Aspect
 from osw_data import Metric
 
 
