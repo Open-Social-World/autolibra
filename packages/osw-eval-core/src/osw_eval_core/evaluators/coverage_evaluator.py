@@ -1,27 +1,21 @@
 import asyncio
-from importlib import resources
 import pickle
-from typing import Any, Literal
-import jinja2
+from typing import Literal
 import logfire
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.gen_eval.generator import MetricTrainingInstance
-from ..gen_eval.feedback_grounding import Aspect, feedback_grounding
+from osw_eval_core.data import Aspect
+from osw_eval_core.data.primitives import Trait
+from ..data import MetricTrainingInstance
+from ..operators import feedback_grounding
 from pydantic import BaseModel, Field, ValidationError, create_model
 from pydantic.fields import FieldInfo
+from osw_eval_core.utils import load_prompt_template
 
 
-def _load_template() -> jinja2.Template:
-    with resources.files("osw_eval_core.templates").joinpath(
-        "aspect_traits_match.j2"
-    ).open("r") as f:
-        return jinja2.Template(f.read())
-
-
-def sanitize_string(s: str) -> str:
+def _sanitize_string(s: str) -> str:
     return (
         s.replace("\\'", "")
         .replace('\\"', "")
@@ -34,46 +28,6 @@ def sanitize_string(s: str) -> str:
     )
 
 
-def create_aspect_traits_match_json_schema(
-    aspects: list[Aspect], traits: list[Metric]
-) -> dict[str, Any]:
-    # First, let's prepare the traits tuple once since it's the same for all trait fields
-    trait_options = [
-        f"{sanitize_string(trait.name)}: {sanitize_string(trait.explanation)}"
-        for trait in traits
-    ] + [
-        "None of the traits matches the aspect.",
-    ]
-
-    # Create fields for aspects and traits
-    schema: dict[str, Any] = {}
-    schema["properties"] = {}
-    for i in range(len(aspects)):
-        # Combine behavior and feedback with properly escaped strings
-        aspect_text = f"{sanitize_string(aspects[i].feedback)} {sanitize_string(aspects[i].behavior)}"
-
-        schema["properties"][f"aspect_{i}"] = {
-            "type": "string",
-            "const": aspect_text,
-            "title": f"Aspect {i}",
-        }
-
-        schema["properties"][f"trait_{i}"] = {
-            "type": "string",
-            "enum": trait_options,
-            "title": f"Trait {i}",
-        }
-
-    schema["required"] = [f"trait_{i}" for i in range(len(aspects))] + [
-        f"aspect_{i}" for i in range(len(aspects))
-    ]
-    schema["title"] = "AspectTraitsMatch"
-    schema["type"] = "object"
-    schema["additionalProperties"] = False
-
-    return schema
-
-
 async def create_aspect_traits_match_pydantic_model(
     aspects: list[Aspect], traits: list[Metric]
 ) -> type[BaseModel]:
@@ -81,9 +35,9 @@ async def create_aspect_traits_match_pydantic_model(
     for i in range(len(aspects)):
         fields[f"aspect_{i}"] = (  # type: ignore[assignment]
             Literal[
-                sanitize_string(aspects[i].feedback)
+                _sanitize_string(aspects[i].feedback)
                 + ": "
-                + sanitize_string(aspects[i].behavior)
+                + _sanitize_string(aspects[i].behavior)
             ],
             Field(title=f"Aspect {i}"),
         )
@@ -91,9 +45,9 @@ async def create_aspect_traits_match_pydantic_model(
         fields[f"trait_{i}"] = (  # type: ignore[assignment]
             Literal[
                 tuple(
-                    sanitize_string(trait.name)
+                    _sanitize_string(trait.name)
                     + ": "
-                    + sanitize_string(trait.explanation)
+                    + _sanitize_string(trait.explanation)
                     for trait in traits
                 )
                 + ("None of the traits matches the aspect.",)
@@ -114,7 +68,7 @@ async def match_aspects_and_traits(
             [aspect], traits
         )
 
-        template = _load_template()
+        template = load_prompt_template("coverage_evaluator_v2.j2")
         prompt = template.render(
             aspects=[aspect],
             traits=traits,
@@ -165,15 +119,12 @@ async def match_aspects_and_traits(
 async def run_instance_coverage_eval(
     client: AsyncAzureOpenAI,
     aspects: list[Aspect],
-    traits: list[Metric],
-    ratings: list[int],
+    traits: list[Trait],
 ) -> tuple[int, int, int, int, list[Aspect]]:
     positive_aspects = [aspect for aspect in aspects if aspect.is_positive]
     negative_aspects = [aspect for aspect in aspects if not aspect.is_positive]
-    positive_traits = [trait for (trait, rating) in zip(traits, ratings) if rating == 1]
-    negative_traits = [
-        trait for (trait, rating) in zip(traits, ratings) if rating == -1
-    ]
+    positive_traits = [trait.metric for trait in traits if trait.rating == 1]
+    negative_traits = [trait.metric for trait in traits if trait.rating == -1]
 
     # Coverage on positive aspects
     try:
@@ -238,23 +189,18 @@ async def run_instance_coverage_eval(
 
 
 async def run_coverage_eval(
-    metrics: list[Metric],
-    metric_scoring: list[list[int]],
+    instance_traits: list[list[Trait]],
     instances: list[MetricTrainingInstance],
     client: AsyncAzureOpenAI,
 ) -> list[tuple[int, int, int, int, list[Aspect]]]:
-    feedback_grounding_results = await asyncio.gather(
+    instance_aspects = await asyncio.gather(
         *[feedback_grounding(instance, client) for instance in instances]
     )
 
     coverage_results = await asyncio.gather(
         *[
-            run_instance_coverage_eval(
-                client, feedback_grounding_result.bullet_points, metrics, ratings
-            )
-            for feedback_grounding_result, ratings in zip(
-                feedback_grounding_results, metric_scoring
-            )
+            run_instance_coverage_eval(client, aspects, traits)
+            for aspects, traits in zip(instance_aspects, instance_traits)
         ]
     )
 

@@ -1,22 +1,12 @@
-from osw_data.dataset import DataInstance
 from importlib import resources
-
-from osw_data import SymmetricTrajectory
-
 import jinja2
+from osw_data.dataset import DataInstance
+from osw_data.trajectory import SymmetricTrajectory
+from osw_eval_core.data.primitives import MetricTrainingInstance
 
 
-def load_template() -> jinja2.Template:
-    with resources.files("osw_eval_core.templates").joinpath(
-        "generate_metrics_v2.j2"
-    ).open("r") as f:
-        return jinja2.Template(f.read())
-
-
-def load_renaming_template() -> jinja2.Template:
-    with resources.files("osw_eval_core.templates").joinpath(
-        "rename_proposed_metrics.j2"
-    ).open("r") as f:
+def load_prompt_template(jinja_file: str) -> jinja2.Template:
+    with resources.files("osw_eval_core.templates").joinpath(jinja_file).open("r") as f:
         return jinja2.Template(f.read())
 
 
@@ -34,16 +24,6 @@ def render_webarena_trajectory(
             for i, p in enumerate(trajectory.points)
         ]
     )
-
-
-class MetricTrainingInstance:
-    def __init__(
-        self, task: str, agent_id: str, trajectory: SymmetricTrajectory, feedback: str
-    ):
-        self.task = task
-        self.agent_id = agent_id
-        self.trajectory = trajectory
-        self.feedback = feedback
 
 
 def render_training_instance(training_instance: MetricTrainingInstance) -> str:

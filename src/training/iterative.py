@@ -14,11 +14,11 @@ from datetime import datetime
 from openai import AsyncAzureOpenAI
 from osw_data import Metric, MultiAgentDataset, MetricSet
 from osw_data.annotation import AnnotationSystem
-from osw_eval_core import MetricTrainingInstance, run_llm_eval
+from osw_eval_core import run_llm_eval, behavior_clustering, feedback_grounding
+from osw_eval_core.data import MetricTrainingInstance, Trait
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.evaluators.coverage_evaluator_v2 import run_coverage_eval
+from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
 from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
-from osw_eval_core.gen_eval import behavior_clustering, feedback_grounding
 import logfire
 
 
@@ -77,10 +77,7 @@ async def iterative_metric_creation(dataset_name: str) -> list[Metric]:
     )
 
     aspects = sum(
-        [
-            feedback_grounding_result.bullet_points
-            for feedback_grounding_result in feedback_grounding_results
-        ],
+        feedback_grounding_results,
         [],
     )
 
@@ -106,9 +103,19 @@ async def iterative_metric_creation(dataset_name: str) -> list[Metric]:
             for eval_result in eval_results
         ]
 
+        traits = [
+            [
+                Trait(
+                    metric=metric,
+                    rating=score,
+                )
+                for metric, score in zip(curr_metrics, eval_scoring_for_instance)
+            ]
+            for eval_scoring_for_instance in eval_scoring
+        ]
+
         coverage_eval_results = await run_coverage_eval(
-            metrics=list(curr_metrics),
-            metric_scoring=eval_scoring,
+            instance_traits=traits,
             instances=metric_training_instances,
             client=client,
         )

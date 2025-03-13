@@ -2,10 +2,10 @@ import pickle
 from openai import AsyncAzureOpenAI
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.evaluators.coverage_evaluator_v2 import (
+from osw_eval_core.evaluators.coverage_evaluator import (
     match_aspects_and_traits,
 )
-from osw_eval_core.gen_eval.feedback_grounding import Aspect
+from osw_eval_core.data import Aspect
 import pytest
 
 """

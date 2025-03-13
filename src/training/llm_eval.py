@@ -4,11 +4,12 @@ from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
 from osw_data.metrics import MetricSet
 from osw_eval_core import (
-    MetricTrainingInstance,
     run_llm_eval,
 )
+from osw_eval_core.data import MetricTrainingInstance
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.evaluators.coverage_evaluator_v2 import run_coverage_eval
+from osw_eval_core.data.primitives import Trait
+from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
 from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
 
 
@@ -73,10 +74,22 @@ async def main(dataset_name: str, metric_path: str) -> None:
             f.write(eval_result.model_dump_json())
             f.write("\n")
 
+    traits = [
+        [
+            Trait(
+                metric=metric,
+                rating=score,
+            )
+            for metric, score in zip(
+                metric_set.metrics.values(), eval_scoring_for_instance
+            )
+        ]
+        for eval_scoring_for_instance in eval_scoring
+    ]
+
     coverage_results = await run_coverage_eval(
-        list(metric_set.metrics.values()),
-        eval_scoring,
-        metric_training_instances,
+        instance_traits=traits,
+        instances=metric_training_instances,
         client=client,
     )
 
