@@ -118,6 +118,8 @@ class BalrogConverter(BaseConverter):
                 # Load json file
                 json_file = json.load(open(json_file))
 
+                prompt_data = json_file["prompt"]
+
                 # Create agent metadata (this does not change within a subtask)
                 agents_metadata = {
                     "agent": AgentMetadata(
@@ -131,6 +133,7 @@ class BalrogConverter(BaseConverter):
                 instance_metadata={
                     "task": json_file["task"],
                     "source_model": json_file["client"]["model_id"],
+                    "prompt": prompt_data,
                     }
 
                 instance_id = dataset.create_instance(
@@ -202,7 +205,7 @@ class BalrogConverter(BaseConverter):
 if __name__ == "__main__":
     # source_path = Path(".data/raw/balrog-minihack_turn_0") # Handle all balrog data in one folder
     # output_path = Path(".data/minihack_turn_0") # Handle all balrog data in one folder
-    source_path = Path(".data/raw/balrog-babaisai_turn_0") # Handle all balrog data in one folder
-    output_path = Path(".data/babaisai_turn_0") # Handle all balrog data in one folder
+    source_path = Path(".data/raw/balrog-babaisai_turn_1") # Handle all balrog data in one folder
+    output_path = Path(".data/babaisai_turn_1") # Handle all balrog data in one folder
 
     run_converter(BalrogConverter, output_path, source_path)
