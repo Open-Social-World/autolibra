@@ -1,37 +1,67 @@
 {
   "bullet_points": [
     {
-      "feedback": "The agent correctly recognizes the key as the victory condition due to the active 'key is win' rule.",
-      "behavior": "Observation reasoning indicating that 'key is win' is the active rule and the plan is oriented towards reaching the key.",
+      "feedback": "The agent correctly recognizes that the wall is not active, and thus 'wall is stop' need not be interacted with.",
+      "behavior": "In the trajectory, the agent reasoning consistently identifies that 'wall is stop' is not an active rule and thus ignores wall interactions.",
       "is_positive": true
     },
     {
-      "feedback": "The agent navigates directly to the key to win.",
-      "behavior": "Actions and observations leading the agent in a direct path towards the key.",
-      "is_positive": true
+      "feedback": "The agent incorrectly interacts with blocks that are immovable or not relevant to the victory condition.",
+      "behavior": "Throughout the trajectory, the agent moves towards blocks that do not contribute to the win condition, such as 'key' or certain walls.",
+      "is_positive": false
     },
     {
-      "feedback": "The agent correctly recognizes that the victory condition is on the same side of the wall as itself.",
-      "behavior": "Observations indicating position of the agent relative to the key and decisions showing interpretation of no need to cross the wall.",
-      "is_positive": true
+      "feedback": "The agent fails to push blocks to construct rules.",
+      "behavior": "In the trajectory, the agent does not attempt to push blocks to form meaningful rules like 'ball is win'.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to recognize it needs to build the win condition by pushing the 'ball' block next to 'is win'.",
+      "behavior": "The trajectory shows the agent not interacting with blocks to create 'ball is win'.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate directly to the win condition as soon as it is accessible.",
+      "behavior": "In multiple steps, the agent moves anisotropically and does not prioritize reaching the 'ball', even when straightforward paths are available.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate according to a plan, instead moving into immovable blocks and moving away from interactive objects, and repeating movements that keep it on the same tile.",
+      "behavior": "Repetitive movements and deviations from a consistent plan towards victory are noted in the trajectory.",
+      "is_positive": false
     }
   ]
 }
 {
   "bullet_points": [
+    {
+      "feedback": "The agent correctly recognizes that the 'wall is stop' rule not blocked on two sides, and thus chooses this method for crossing the wall.",
+      "behavior": "Trajectory steps where the agent approaches the 'stop' rule to break the 'wall is stop' rule.",
+      "is_positive": true
+    },
     {
       "feedback": "The agent correctly breaks the 'wall is stop' rule when it realizes that the win condition is across the wall, and it needs to make the wall non-solid to reach it.",
-      "behavior": "Actions leading to breaking the 'wall is stop' rule.",
+      "behavior": "Trajectory steps where the agent moves the 'stop' block away to deactivate the 'wall is stop' rule.",
       "is_positive": true
     },
     {
-      "feedback": "The agent fails to navigate directly to the win condition specified by the active win condition rule 'ball is win'.",
-      "behavior": "When the agent navigates towards the win condition rule 'ball is win' but does not achieve reaching it directly.",
+      "feedback": "The agent fails to push blocks to construct rules.",
+      "behavior": "Trajectory observations where interactive blocks are present but no action is taken to align them meaningfully.",
       "is_positive": false
     },
     {
-      "feedback": "The agent fails to understand when the win condition is active 'ball is win' blocks is joined instead of apart.",
-      "behavior": "Actions when the agent acts as though it does not recognize the active condition 'ball is win'.",
+      "feedback": "The agent fails to recognize it needs to build the win condition by pushing the 'key' block next to 'is win'.",
+      "behavior": "Trajectory sections where the 'key', 'is', and 'win' blocks are accessible but not utilized.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate directly to the win condition as soon as it is accessible.",
+      "behavior": "Trajectory sections after the 'wall is stop' rule is deactivated where the agent does not approach the 'win' condition efficiently.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate according to a plan, instead moving into immovable blocks and moving away from interactive objects, and repeating movements that keep it on the same tile.",
+      "behavior": "Trajectory steps where the agent performs redundant movements or interacts inefficiently with the environment.",
       "is_positive": false
     }
   ]
@@ -39,174 +69,57 @@
 {
   "bullet_points": [
     {
-      "feedback": "The agent fails to break the 'baba is you' rule by replacing 'baba' with a 'key' block.",
-      "behavior": "The agent continues to move right and explore the area, but does not attempt to modify the rule blocks to change 'baba is you'.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent fails to recognize that the 'wall is stop' blocks are immovable.",
-      "behavior": "The agent attempts to move towards and around walls, but does not try to interact with or modify the 'wall is stop' rule.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent fails to recognize that the goal is on the other side of the wall, and therefore the wall must be bypassed.",
-      "behavior": "The agent moves around in areas near rules and walls, but does not investigate mechanisms to bypass walls to reach objectives.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent fails to recognize that it needs to build the 'door is win' rule to make the victory condition active.",
-      "behavior": "The agent does not attempt to rearrange rule blocks to create the 'door is win' condition.",
-      "is_positive": false
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent fails to recognize that the wall is blocking, and thus needs to be bypassed by making the wall non-solid, only doing so after a large number of turns.",
-      "behavior": "The agent repeatedly attempts to move right into the position where walls are located without making the blocking walls non-solid first, only eventually performing actions to bypass the blocking walls.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent fails to navigate directly to the win condition specified by the active win condition rule 'ball is win', and instead explores.",
-      "behavior": "The agent continues to perform repeated 'right' and 'down' actions without making progress towards the observed win condition 'ball is win', indicating exploration behavior or lack of direction.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent correctly identifies 'ball is win' rule, and identifies the ball as the win condition.",
-      "behavior": "The agent's reasoning and actions indicate it is aware of the 'ball is win' rule and recognizes the ball as the target object for the win condition, as per its observation processing.",
-      "is_positive": true
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent correctly identified 'ball is win' as the victory condition.",
-      "behavior": "Observation: {'observations': 'Active rules: ball is win baba is you  Objects on the map: wall 3 steps to the right and 3 step up rule `ball`...'} ",
+      "feedback": "The agent correctly recognizes that the 'wall is stop' rule is not blocked on two sides, and thus chooses this method for crossing the wall.",
+      "behavior": "Initially, based on the 'Observation' and 'Action', the agent's decision to head towards the 'wall is stop' rule for breaking it demonstrates this recognition.",
       "is_positive": true
     },
-    {
-      "feedback": "The agent moved towards the ball to win.",
-      "behavior": "Action: {'reasoning': '<|ACTION|>up<|END|>', 'text': 'up' } and subsequent observations showing movement closer to the ball.",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent correctly identified that the goal was not blocked by a wall.",
-      "behavior": "Observation inspections showing clear path to the ball, no 'stop' or 'wall' rules obstructing the goal.",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent did not attempt to break any rules.",
-      "behavior": "Actions were consistent with moving towards the 'win' condition, no interactions with rules affecting gameplay.",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent moved directly towards the ball, not distracted by other objects and not exploring.",
-      "behavior": "Sequence of actions showing direct pathing to the ball without deviation.",
-      "is_positive": true
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent fails to recognize that the door is the victory condition due to the active 'door is win' rule.",
-      "behavior": "Repeated actions not taking steps towards navigating towards the door despite 'door is win' being active.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent does not navigate towards the door as specified by the rules.",
-      "behavior": "Actions taken in movement that do not seem to prioritize reaching the door remain consistent throughout the trajectory.",
-      "is_positive": false
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent fails to break the 'baba is you' rule by replacing 'baba' with 'ball', thus making it incapable of crossing the wall.",
-      "behavior": "Throughout the trajectory, the agent repeatedly navigates the surroundings but does not interact with the rules to change 'baba is you' to 'ball is you' to attempt to bypass the 'wall is stop' rule.",
-      "is_positive": false
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent correctly recognizes the ball as the victory condition due to the active \"ball is win\" rule.",
-      "behavior": "The trajectory shows that the agent moves towards the location of the ball and aims to reach it, adhering to the rule \"ball is win\".",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent fails to recognize that it is unnecessary to break the \"wall is stop\" rule as the active victory condition is on the same side as the agent, and thus no wall interaction is required.",
-      "behavior": "The trajectory includes actions where the agent interacts with the rules relating to \"wall is stop,\" indicating unnecessary attempts to manipulate this rule.",
-      "is_positive": false
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent correctly breaks the \"baba is you\" rule by replacing \"baba\" with \"key\", thus making it capable of crossing the wall.",
-      "behavior": "This is observed in the trajectory where the agent moves the blocks such that \"key\" becomes \"you\".",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent correctly recognizes that the wall is blocking, and thus needs to be bypassed.",
-      "behavior": "This is observed in the trajectory where the agent plans to break the \"wall is stop\" rule.",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent fails to recognize that the win condition needs to be built by moving the \"ball\" block next to the \"is win\" blocks.",
-      "behavior": "This is observed as the agent does not address the \"is win\" condition during its actions despite performing other rule adjustments.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent correctly recognizes that the \"wall is stop\" rule is blocked on two sides, and thus finds an alternative method of crossing the wall.",
-      "behavior": "This is observed as the agent plans and acts to bypass the wall by changing the rules rather than directly interacting with \"wall is stop\" blocks.",
-      "is_positive": true
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent correctly recognizes the ball as the victory condition due to the active 'ball is win' rule.",
-      "behavior": "Observation indicates the active rule 'ball is win', which informs the agent of the ball being the victory condition.",
-      "is_positive": true
-    },
-    {
-      "feedback": "The agent recognizes that the victory condition is on the same side of the wall as itself and does not need to cross the wall to win.",
-      "behavior": "Observation shows the spatial arrangement of the ball and wall relative to the agent, and the agent's lack of actions attempting to cross the wall.",
-      "is_positive": true
-    }
-  ]
-}
-{
-  "bullet_points": [
-    {
-      "feedback": "The agent fails to recognize that the wall is blocking, and thus needs to be bypassed by making the wall non-solid.",
-      "behavior": "Multiple observations show that the rule 'wall is stop' is active, and the agent performs actions that seem exploratory instead of addressing this rule.",
-      "is_positive": false
-    },
-    {
-      "feedback": "The agent does not navigate directly to the win condition specified by the active win condition rule 'ball is win'.",
-      "behavior": "Observations where 'ball is win' is active, but the agent takes actions that explore or alter other rules rather than going directly to the 'ball' object.",
-      "is_positive": false
-    }
-  ]
-}
-{
-  "bullet_points": [
     {
       "feedback": "The agent correctly breaks the 'wall is stop' rule when it realizes that the win condition is across the wall, and it needs to make the wall non-solid to reach it.",
-      "behavior": "The 'wall is stop' rule becomes absent starting from the observation sequence where 'wall' is manipulated.",
+      "behavior": "The progression in observations indicating the removal of the 'wall is stop' rule correlates with the agent's actions toward breaking the rule.",
       "is_positive": true
     },
     {
-      "feedback": "The agent fails to navigate directly to the win condition specified by the active win condition rule 'door is win', and instead explores.",
-      "behavior": "Throughout the trajectory, the agent performs several actions that do not progress towards the 'door', as opposed to directly moving towards it.",
+      "feedback": "The agent correctly ignores the key and the 'baba is you' rules, as they are not relevant to the task completion.",
+      "behavior": "Throughout the trajectory, the agent does not interact with the key or make unnecessary movements towards 'baba is you'.",
+      "is_positive": true
+    },
+    {
+      "feedback": "The agent fails to navigate directly to the win condition as soon as it is accessible.",
+      "behavior": "After the 'wall is stop' rule is broken, actions not directed at the 'ball is win' entity demonstrate the lack of direct navigation.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate according to a plan, instead moving into immovable blocks and moving away from interactive objects.",
+      "behavior": "Repeated actions that avoid progression toward 'ball is win' and instead interact with immovable blocks suggest incoherent navigation.",
+      "is_positive": false
+    }
+  ]
+}
+{
+  "bullet_points": [
+    {
+      "feedback": "The agent correctly recognizes that the wall is active, and thus needs to bypass the wall.",
+      "behavior": "Observation: The agent perceives 'wall is stop'. Reasoning: The agent acknowledges that the 'wall is stop' rule makes walls impassable. Action: Moves in directions away from impassable walls.",
+      "is_positive": true
+    },
+    {
+      "feedback": "The agent incorrectly interacts with blocks that are immovable or not relevant to the victory condition.",
+      "behavior": "Observation: The agent encounters immovable blocks. Action: Despite this, the agent attempts to interact with these blocks.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to push blocks to construct rules, not understanding that it needs to change its avatar by replacing 'baba' with 'door'.",
+      "behavior": "Observation: 'baba is you' is active. Reasoning: The agent does not attempt to move active rules to replace 'baba' with 'door'.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to recognize it needs to build the win condition by pushing the 'key' block next to 'is win'.",
+      "behavior": "Observation: 'is win' block is accessible, and 'key' block is also accessible. Action: The agent does not move the 'key' block towards 'is win'.",
+      "is_positive": false
+    },
+    {
+      "feedback": "The agent fails to navigate according to a plan, instead moving into immovable blocks and moving away from interactive objects, and repeating movements that keep it on the same tile.",
+      "behavior": "Observation: Patterns of repetitive movement, moves resulting in staying on the same tile or interacting excessively with immovable blocks.",
       "is_positive": false
     }
   ]

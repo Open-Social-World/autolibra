@@ -83,7 +83,7 @@ async def main(dataset_name: str, metric_path: str) -> None:
 if __name__ == "__main__":
     asyncio.run(
         main(
-            dataset_name="babaisai_turn_1",
-            metric_path=".data/metrics/babaisai_turn_1/03_14_12_55",
-        ),
+            dataset_name="babaisai_turn_2_mod3",
+            metric_path=".data/metrics/babaisai_turn_1/03_17_18_08",
+        )
     )

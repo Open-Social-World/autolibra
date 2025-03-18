@@ -26,6 +26,18 @@ class BalrogConverter(BaseConverter):
     def __init__(self, output_path: Path, source_path: Path):
         super().__init__(output_path, source_path)
 
+    @staticmethod
+    def clean_csv_file(file_path: Path) -> None:
+        """Remove NUL characters from a CSV file."""
+        with open(file_path, "rb") as f:
+            content = f.read()
+        
+        # Remove NUL characters
+        content = content.replace(b'\x00', b'')
+        
+        with open(file_path, "wb") as f:
+            f.write(content)
+
     def _setup_constants(self) -> None:
         """Setup Balrog-specific constants, i.e. action space"""
 
@@ -88,7 +100,6 @@ class BalrogConverter(BaseConverter):
         turn = self.source_path.name.split("_")[-1]
         task = self.source_path.name.split("_")[0].split("-")[-1]
         summary_path = self.source_path.with_name(self.source_path.name.replace(f"balrog-{task}", "balrog"))
-        # Capitalize first letter
         task = task[0].upper() + task[1:]
 
         # Initialize dataset
@@ -108,13 +119,16 @@ class BalrogConverter(BaseConverter):
         # Iterate over folders in task_dir
         for subtask in subtasks:
             subtask_dir = self.source_path / subtask
+            
 
             fpl = file_pairs_list(subtask_dir)
 
             for traj_file, json_file in fpl:
                 # Get pair of files in subtask_dir
                 episode_number = str(str(json_file).split("_")[-1].split('.')[0])
-
+                # Clean the CSV file before processing
+                csv_path = subtask_dir / f"{subtask}_run_{episode_number}.csv" 
+                self.clean_csv_file(csv_path)  # Call the clean_csv_file method
                 # Load json file
                 json_file = json.load(open(json_file))
 
@@ -140,8 +154,7 @@ class BalrogConverter(BaseConverter):
                     agents_metadata=agents_metadata,
                     instance_metadata=instance_metadata
                 )
-                print(f"Created instance {instance_id}")
-
+                self.logger.info(f"Created instance {instance_id} for episode number {episode_number}")
 
                 gif_path = subtask_dir / f"episode_{episode_number}.gif"
                 # Copy gif to output path
@@ -205,7 +218,7 @@ class BalrogConverter(BaseConverter):
 if __name__ == "__main__":
     # source_path = Path(".data/raw/balrog-minihack_turn_0") # Handle all balrog data in one folder
     # output_path = Path(".data/minihack_turn_0") # Handle all balrog data in one folder
-    source_path = Path(".data/raw/balrog-babaisai_turn_1") # Handle all balrog data in one folder
-    output_path = Path(".data/babaisai_turn_1") # Handle all balrog data in one folder
+    source_path = Path(".data/raw/balrog-babaisai_turn_2_mod3") # Handle all balrog data in one folder
+    output_path = Path(".data/babaisai_turn_2_mod3") # Handle all balrog data in one folder
 
     run_converter(BalrogConverter, output_path, source_path)
