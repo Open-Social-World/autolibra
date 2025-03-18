@@ -2,10 +2,10 @@ import pickle
 from openai import AsyncAzureOpenAI
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.evaluators.coverage_evaluator_v2 import (
+from osw_eval_core.evaluators.coverage_evaluator import (
     match_aspects_and_traits,
 )
-from osw_eval_core.gen_eval.feedback_grounding import BehavirorFeedback
+from osw_eval_core.data import Aspect
 import pytest
 
 """
@@ -19,12 +19,12 @@ import pytest
 """
 
 _aspects = [
-    BehavirorFeedback(
+    Aspect(
         feedback="The agent initially tried to find the contributors through the Commit history or Graph tab which are reasonable guesses, but the Contributor tab is the most straightforward choice.",
         behavior="The agent went step by step through different sections (Commits, Graph) before navigating to the Contributors tab.",
         is_positive=True,
     ),
-    BehavirorFeedback(
+    Aspect(
         feedback="Anyway, the agent made the right choice in the end which is good although wasting a few more steps.",
         behavior="The agent ultimately navigated to the Contributors tab and successfully identified the top contributor.",
         is_positive=True,
@@ -44,7 +44,7 @@ _traits = [
 
 
 @pytest.mark.asyncio
-async def test_match_aspects_and_traits():
+async def test_match_aspects_and_traits() -> None:
     settings = OSWEvalSettings()
 
     (_aspects, _traits) = pickle.load(

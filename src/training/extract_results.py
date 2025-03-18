@@ -2,7 +2,7 @@ import json
 import polars as pl
 
 
-def convert_jsonl_to_table(file_path):
+def convert_jsonl_to_table(file_path: str) -> pl.DataFrame:
     # Read records into a list
     records = []
     with open(file_path, "r") as file:

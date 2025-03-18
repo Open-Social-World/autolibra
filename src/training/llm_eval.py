@@ -1,12 +1,15 @@
 import asyncio
+from openai import AsyncAzureOpenAI
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
 from osw_data.metrics import MetricSet
 from osw_eval_core import (
-    MetricTrainingInstance,
     run_llm_eval,
 )
-from osw_eval_core.evaluators.coverage_evaluator_v2 import run_coverage_eval
+from osw_eval_core.data import MetricTrainingInstance
+from osw_eval_core.configs import OSWEvalSettings
+from osw_eval_core.data.primitives import Trait
+from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
 from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
 
 
@@ -26,6 +29,14 @@ async def main(dataset_name: str, metric_path: str) -> None:
         induced_from=dataset_name,
     )
 
+    settings = OSWEvalSettings()
+
+    client = AsyncAzureOpenAI(
+        api_key=settings.azure_api_key,
+        api_version="2024-12-01-preview",
+        azure_endpoint=settings.azure_endpoint,
+    )
+
     metric_training_instances: list[MetricTrainingInstance] = []
 
     for instances in dataset.list_instances():
@@ -42,12 +53,12 @@ async def main(dataset_name: str, metric_path: str) -> None:
                         else "Task is described in the trajectory observation",
                         agent_id=agent_id,
                         trajectory=dataset.get_trajectory(instances, agent_id),
-                        feedback=annotation.content,
+                        feedback=str(annotation.content),
                     )
                 )
 
     eval_results = await run_llm_eval(
-        metric_training_instances, list(metric_set.metrics.values())
+        metric_training_instances, list(metric_set.metrics.values()), client=client
     )
 
     eval_scoring = [
@@ -63,8 +74,23 @@ async def main(dataset_name: str, metric_path: str) -> None:
             f.write(eval_result.model_dump_json())
             f.write("\n")
 
+    traits = [
+        [
+            Trait(
+                metric=metric,
+                rating=score,
+            )
+            for metric, score in zip(
+                metric_set.metrics.values(), eval_scoring_for_instance
+            )
+        ]
+        for eval_scoring_for_instance in eval_scoring
+    ]
+
     coverage_results = await run_coverage_eval(
-        metric_set.metrics.values(), eval_scoring, metric_training_instances
+        instance_traits=traits,
+        instances=metric_training_instances,
+        client=client,
     )
 
     covered, total = 0, 0
@@ -83,7 +109,7 @@ async def main(dataset_name: str, metric_path: str) -> None:
 if __name__ == "__main__":
     asyncio.run(
         main(
-            dataset_name="babaisai_turn_2_mod3",
-            metric_path=".data/metrics/babaisai_turn_1/03_17_18_08",
-        )
+            dataset_name="cogym",
+            metric_path=".data/metrics/cogym/02_18_17_22",
+        ),
     )

@@ -109,18 +109,6 @@ class WebVoyagerNNetNavConverter(BaseConverter):
             description="Web interaction trajectories from WebArena dataset",
         )
 
-        annotation_system = AnnotationSystem(
-            base_path=self.annotation_path,
-            project_name="WebVoyager Annotations",
-            description="Free-form text annotations of agent trajectories for WebVoyager",
-            annotation_schema={
-                "feedback": {
-                    "type": "string",
-                    "description": "Free-form text feedback on the trajectory",
-                }
-            },
-        )
-
         task_id2instance_id: dict[str, str] = {}
 
         # Read trajectories
@@ -227,6 +215,18 @@ class WebVoyagerNNetNavConverter(BaseConverter):
                         )
 
         if self.annotation_path:
+            annotation_system = AnnotationSystem(
+                base_path=self.annotation_path,
+                project_name="WebVoyager Annotations",
+                description="Free-form text annotations of agent trajectories for WebVoyager",
+                annotation_schema={
+                    "feedback": {
+                        "type": "string",
+                        "description": "Free-form text feedback on the trajectory",
+                    }
+                },
+            )
+
             annotation_system.add_annotator(
                 annotator_id="Shikhar",
                 name="Shikhar Murty",
@@ -234,10 +234,10 @@ class WebVoyagerNNetNavConverter(BaseConverter):
             with open(self.source_path / "feedback.json", "r") as f:
                 task_id2feedback = json.load(f)
                 for task_id in task_id2feedback:
-                    instance_id = task_id2instance_id.get(task_id)
-                    if instance_id:
+                    instance_id_or_none = task_id2instance_id.get(task_id)
+                    if instance_id_or_none:
                         annotation_system.add_annotation(
-                            instance_id=instance_id,
+                            instance_id=instance_id_or_none,
                             agent_id="agent",
                             content={"feedback": task_id2feedback[task_id]},
                             annotator_id="Shikhar",

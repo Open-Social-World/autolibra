@@ -4,10 +4,8 @@ import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 from osw_data.metrics import Metric
 from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.gen_eval.generator import (
-    MetricTrainingInstance,
-    render_training_instance,
-)
+from ..data import MetricTrainingInstance
+from ..utils import render_training_instance
 from pydantic import BaseModel, ValidationError, create_model, Field
 from typing import Literal
 
@@ -17,8 +15,8 @@ def _make_snake_case(name: str) -> str:
 
 
 def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
-    eval_result = create_model(
-        "EvaluationResult",
+    eval_result = create_model(  # type: ignore[call-overload]
+        model_name="EvaluationResult",
         **{
             _make_snake_case(metric.name) + "_reasoning": (
                 str,
@@ -35,7 +33,7 @@ def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
         },
     )
 
-    return eval_result
+    return eval_result  # type: ignore[no-any-return]
 
 
 def _load_llm_eval_template() -> jinja2.Template:
@@ -50,7 +48,7 @@ semaphore = asyncio.Semaphore(20)  # Limit to 3 concurrent tasks
 
 async def eval_instance(
     instance: MetricTrainingInstance, metrics: list[Metric], client: AsyncAzureOpenAI
-) -> list[BaseModel]:
+) -> BaseModel:
     settings = OSWEvalSettings()
     template = _load_llm_eval_template()
 
@@ -59,17 +57,21 @@ async def eval_instance(
         metrics=metrics,
     )
 
+    model = settings.azure_openai_o3_model
+    assert model
+
     async with semaphore:
         while True:
             wait_time = 1
             try:
                 completion = await client.beta.chat.completions.parse(
-                    model=settings.azure_openai_o3_model,
+                    model=model,
                     messages=[
                         {"role": "system", "content": "Evaluate the trajectory."},
                         {"role": "user", "content": prompt},
                     ],
                     response_format=_make_evaluation_result_class(metrics),
+                    reasoning_effort="medium",
                 )
 
                 if not completion.choices[0].message.parsed:
@@ -89,16 +91,10 @@ async def eval_instance(
 
 
 async def run_llm_eval(
-    instances: list[MetricTrainingInstance], metrics: list[Metric]
+    instances: list[MetricTrainingInstance],
+    metrics: list[Metric],
+    client: AsyncAzureOpenAI,
 ) -> list[BaseModel]:
-    settings = OSWEvalSettings()
-
-    client = AsyncAzureOpenAI(
-        api_key=settings.azure_api_key,
-        api_version="2024-12-01-preview",
-        azure_endpoint=settings.azure_endpoint,
-    )
-
     eval_results = await asyncio.gather(
         *[eval_instance(instance, metrics, client) for instance in instances]
     )

@@ -235,10 +235,10 @@ class WebVoyagerNNetNavConverter(BaseConverter):
             with open(self.source_path / "feedback.json", "r") as f:
                 task_id2feedback = json.load(f)
                 for task_id in task_id2feedback:
-                    instance_id = task_id2instance_id.get(task_id)
-                    if instance_id:
+                    instance_id_or_none = task_id2instance_id.get(task_id)
+                    if instance_id_or_none:
                         annotation_system.add_annotation(
-                            instance_id=instance_id,
+                            instance_id=instance_id_or_none,
                             agent_id="agent",
                             content={"feedback": task_id2feedback[task_id]},
                             annotator_id="Shikhar",

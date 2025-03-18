@@ -173,6 +173,10 @@ cython_debug/
 .data
 .vscode
 
+<<<<<<< HEAD
 
 # Other files
 2025-02-24_00-23-16_robust_cot_gemini-1.5-pro-002
+=======
+.DS_Store
+>>>>>>> 51687d14f2e295ba8e0444ad62554dd551354992
