@@ -68,7 +68,7 @@ async def match_aspects_and_traits(
             [aspect], traits
         )
 
-        template = load_prompt_template("coverage_evaluator_v2.j2")
+        template = load_prompt_template("coverage_evaluation_v2.j2")
         prompt = template.render(
             aspects=[aspect],
             traits=traits,
