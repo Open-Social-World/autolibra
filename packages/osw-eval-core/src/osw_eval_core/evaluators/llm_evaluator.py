@@ -16,7 +16,7 @@ def _make_snake_case(name: str) -> str:
 
 def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
     eval_result = create_model(  # type: ignore[call-overload]
-        model_name="EvaluationResult",
+        "EvaluationResult",
         **{
             _make_snake_case(metric.name) + "_reasoning": (
                 str,
@@ -32,7 +32,6 @@ def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
             for metric in metrics
         },
     )
-
     return eval_result  # type: ignore[no-any-return]
 
 

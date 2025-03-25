@@ -68,7 +68,7 @@ async def match_aspects_and_traits(
             [aspect], traits
         )
 
-        template = load_prompt_template("coverage_evaluator_v2.j2")
+        template = load_prompt_template("coverage_evaluation_v2.j2")
         prompt = template.render(
             aspects=[aspect],
             traits=traits,
@@ -196,6 +196,13 @@ async def run_coverage_eval(
     instance_aspects = await asyncio.gather(
         *[feedback_grounding(instance, client) for instance in instances]
     )
+
+    with open("feedback_grounding_results.jsonl", "w") as f:
+        for feedback_grounding_result in instance_aspects:
+            for aspect in feedback_grounding_result:
+                f.write(aspect.model_dump_json(indent=2))
+                f.write("\n")
+            f.write("\n")
 
     coverage_results = await asyncio.gather(
         *[

@@ -3,7 +3,7 @@ import json
 # Load llm_eval_results.jsonl
 
 scores = {}
-for row in open("llm_eval_results_2_mod2.jsonl"):
+for row in open("llm_eval_results.jsonl"):
     data = json.loads(row)
     for key, value in data.items():
         # Add all new keys to the dictionary
@@ -16,6 +16,9 @@ for row in open("llm_eval_results_2_mod2.jsonl"):
             scores[key][1] += 1
         elif value == 1:
             scores[key][2] += 1
+
+# Remove [0,0,0] entries, as these are purely text
+scores = {key: val for key, val in scores.items() if sum(val) > 0}
 
 for key,val in scores.items():
     print(key, val)
