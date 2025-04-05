@@ -32,7 +32,6 @@ def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
             for metric in metrics
         },
     )
-
     return eval_result  # type: ignore[no-any-return]
 
 

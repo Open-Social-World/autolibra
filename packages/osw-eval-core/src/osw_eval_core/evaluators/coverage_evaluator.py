@@ -197,6 +197,13 @@ async def run_coverage_eval(
         *[feedback_grounding(instance, client) for instance in instances]
     )
 
+    with open("feedback_grounding_results.jsonl", "w") as f:
+        for feedback_grounding_result in instance_aspects:
+            for aspect in feedback_grounding_result:
+                f.write(aspect.model_dump_json(indent=2))
+                f.write("\n")
+            f.write("\n")
+
     coverage_results = await asyncio.gather(
         *[
             run_instance_coverage_eval(client, aspects, traits)

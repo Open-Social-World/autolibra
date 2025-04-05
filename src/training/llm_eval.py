@@ -106,10 +106,18 @@ async def main(dataset_name: str, metric_path: str) -> None:
     print(f"Redundancy: {redundant}/{total_traits}")
 
 
+# if __name__ == "__main__":
+#     asyncio.run(
+#         main(
+#             dataset_name="babaisai_turn_2_mod2",
+#             metric_path=".data/metrics/babaisai_turn_2/03_17_18_08",
+#         ),
+#     )
+
 if __name__ == "__main__":
     asyncio.run(
         main(
-            dataset_name="cogym",
-            metric_path=".data/metrics/cogym/02_18_17_22",
+            dataset_name="babaisai_turn_3",
+            metric_path=".data/metrics/babaisai_turn_3/03_24_18_32",
         ),
     )
