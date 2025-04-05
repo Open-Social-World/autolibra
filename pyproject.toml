@@ -28,15 +28,7 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.2",
-<<<<<<< HEAD
-]
-
-[project.optional-dependencies]
-notebook = [
-    "marimo>=0.10"
-=======
     "pandas-stubs>=2.2",
->>>>>>> 51687d14f2e295ba8e0444ad62554dd551354992
 ]
 
 [project.optional-dependencies]

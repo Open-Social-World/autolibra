@@ -1,6 +1,0 @@
-```bash
-uv run python -m packages.osw-eval-core.src.osw_eval_core.datasets.balrog_fixed
-```
-
-uv run python src/tty/tty_annotation.py .data/minihack_turn_0 .data/annotations/minihack_turn_0 --annotator-id Phil
-uv run python src/tty/tty_annotation.py .data/babaisai_turn_0 .data/annotations/babaisai_turn_0 --annotator-id Phil
