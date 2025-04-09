@@ -41,7 +41,7 @@ uv run streamlit run src/tty/tty_annotation.py .data/sotopia .data/annotations/s
 
 ### View Annotations with Streamlit
 ```bash
-streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotations
+uv run streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotations
 ```
 
 ### To run metric extraction

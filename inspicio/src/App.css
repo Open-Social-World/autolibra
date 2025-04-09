@@ -1,0 +1,5 @@
+/* Improve readability of conversation content */
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
