@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,7 @@ import { MessageSquare, Users, Calendar } from 'lucide-react';
 import { LabeledButton } from "@/components/LabeledButton";
 import { MetricSidebar } from "@/components/MetricSidebar";
 import sotopiaLogo from "../assets/sotopia-logo.png";
+import { useNavigate } from "react-router-dom";
 
 interface Label {
   instance_id: string;
@@ -56,6 +57,7 @@ function SotopiaDashboard() {
   const [scenario, setScenario] = useState<string>("");
   const [metrics, setMetrics] = useState<Record<string, MetricData> | null>(null);
   const [metricDetails, setMetricDetails] = useState<Record<string, MetricDetails> | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Fetch labels when component mounts
@@ -225,11 +227,11 @@ function SotopiaDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Left Sidebar - Trajectories */}
         <div className="md:col-span-3">
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
               <CardTitle>Trajectories</CardTitle>
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
               <ScrollArea className="h-[70vh]">
                 {loading ? (
                   // Loading skeletons
@@ -269,13 +271,13 @@ function SotopiaDashboard() {
                   </div>
                 )}
               </ScrollArea>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </div>
-
+        
         {/* Middle Panel - Conversation */}
         <div className="md:col-span-6">
-          <Card>
+        <Card>
             <CardHeader className="p-0">
               {selectedInstance ? (
                 <div className="p-6">
@@ -295,8 +297,8 @@ function SotopiaDashboard() {
               ) : (
                 <CardTitle className="p-6">Select a conversation</CardTitle>
               )}
-            </CardHeader>
-            <CardContent>
+          </CardHeader>
+          <CardContent>
               {scenario && (
                 <div className="mb-6 p-4 bg-muted/50 rounded-lg">
                   <h3 className="text-sm font-medium mb-2">Scenario:</h3>
@@ -340,8 +342,8 @@ function SotopiaDashboard() {
                   </div>
                 )}
               </ScrollArea>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </div>
         
         {/* Right Sidebar - Metrics */}
