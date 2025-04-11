@@ -131,31 +131,37 @@ def get_trajectory(instance_id: str):
                 # Trim whitespace
                 scenario = scenario.strip()
         
-        # Extract metrics from metadata
+        # Extract metrics and agent backgrounds in a single pass
         metrics = {}
         metric_details = {}
+        agent_backgrounds = {}
         
-        if metric_set and metadata and hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
-            if "rewards" in metadata.metadata and isinstance(metadata.metadata["rewards"], list):
-                for i, reward in enumerate(metadata.metadata["rewards"]):
-                    agent_id = list(metadata.agents.keys())[i] if i < len(metadata.agents) else f"Agent {i+1}"
-                    metrics[agent_id] = reward
-                    
-                    # Process each metric to get its details
-                    for metric_name in reward.keys():
-                        normalized_name = metric_name.replace("/", "_")  # Match the normalization in Metric class
-                        if normalized_name in metric_set.metrics:
-                            metric = metric_set.metrics[normalized_name]
-                            metric_details[metric_name] = {
-                                "explanation": metric.explanation,
-                                "good_behaviors": metric.good_behaviors,
-                                "bad_behaviors": metric.bad_behaviors
-                            }
-        
-        # Add debug logging
-        logger.info(f"Available metrics in metric_set: {list(metric_set.metrics.keys()) if metric_set else 'None'}")
-        logger.info(f"Metrics in reward: {list(reward.keys())}")
-        logger.info(f"Extracted metric details: {metric_details}")
+        if metadata:
+            # Extract agent backgrounds from agent parameters
+            if hasattr(metadata, "agents") and metadata.agents:
+                for agent_id, agent_data in metadata.agents.items():
+                    if hasattr(agent_data, "parameters") and isinstance(agent_data.parameters, dict):
+                        if "background" in agent_data.parameters:
+                            agent_backgrounds[agent_id] = agent_data.parameters["background"]
+            
+            # Extract metrics from metadata
+            if hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
+                if "rewards" in metadata.metadata and isinstance(metadata.metadata["rewards"], list):
+                    for i, reward in enumerate(metadata.metadata["rewards"]):
+                        agent_id = list(metadata.agents.keys())[i] if i < len(metadata.agents) else f"Agent {i+1}"
+                        metrics[agent_id] = reward
+                        
+                        # Process each metric to get its details
+                        if metric_set:
+                            for metric_name in reward.keys():
+                                normalized_name = metric_name.replace("/", "_")  # Match the normalization in Metric class
+                                if normalized_name in metric_set.metrics:
+                                    metric = metric_set.metrics[normalized_name]
+                                    metric_details[metric_name] = {
+                                        "explanation": metric.explanation,
+                                        "good_behaviors": metric.good_behaviors,
+                                        "bad_behaviors": metric.bad_behaviors
+                                    }
         
         # Get trajectory data
         conversation = []
@@ -207,7 +213,8 @@ def get_trajectory(instance_id: str):
             "conversation": conversation,
             "scenario": scenario,
             "metrics": metrics,
-            "metric_details": metric_details
+            "metric_details": metric_details,
+            "agent_backgrounds": agent_backgrounds
         }
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Instance not found: {str(e)}")

@@ -12,6 +12,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 export interface MetricValue {
   value: number;
@@ -30,6 +31,7 @@ export interface MetricSidebarProps {
   title?: string;
   metrics?: Record<string, Record<string, MetricValue>>;
   metricDetails?: Record<string, MetricDetail>;
+  agentBackgrounds?: Record<string, string>;
   isLoading?: boolean;
   selectedId?: string | null;
   emptyMessage?: string;
@@ -43,6 +45,7 @@ export function MetricSidebar({
   title = "Metrics",
   metrics,
   metricDetails,
+  agentBackgrounds = {},
   isLoading = false,
   selectedId = null,
   emptyMessage = "No metrics available",
@@ -157,6 +160,48 @@ export function MetricSidebar({
     );
   };
 
+  const formatAgentBackground = (background: string) => {
+    const basics = background.match(/^(.*?)(?=\. (He|She|They)\/)/);
+    const pronouns = background.match(/(He|She|They)\/(him|her|them) pronouns/);
+    const hobbies = background.match(/\. ([^.]*?(enjoys|likes|loves|passionate about|interested in)[^.]*\.)/);
+    const personality = background.match(/Personality and values description: ([^.]*(?:\.[^.]*(?!secrets:))*\.)/i);
+    const secret = background.match(/([^.]*secret:[^.]*\.)/i);
+
+    return (
+      <>
+        {basics && (
+          <div>
+            <span className="font-medium">Basics:</span> {basics[1].trim()}
+          </div>
+        )}
+        {pronouns && (
+          <div>
+            <span className="font-medium">Pronouns:</span> {pronouns[0].replace(" pronouns", "")}
+          </div>
+        )}
+        {hobbies && (
+          <div>
+            <span className="font-medium">Interests:</span> {hobbies[1].trim()}
+          </div>
+        )}
+        {personality && (
+          <div>
+            <span className="font-medium">Personality:</span> {personality[1].trim()}
+          </div>
+        )}
+        {secret && (
+          <div>
+            <span className="font-medium">Secret:</span> {secret[1].trim()}
+          </div>
+        )}
+        {/* If no patterns matched, show the raw text */}
+        {!basics && !pronouns && !hobbies && !personality && !secret && (
+          <p>{background}</p>
+        )}
+      </>
+    );
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -180,46 +225,65 @@ export function MetricSidebar({
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(metrics).map(([categoryId, categoryMetrics]) => {
+              {Object.entries(metrics).map(([agentId, agentMetrics]) => {
                 // Get overall score if it exists
-                const overallScore = categoryMetrics.overall_score || 
-                                    categoryMetrics.overall || 
-                                    categoryMetrics.score;
+                const overallScore = agentMetrics.overall_score || 
+                                    agentMetrics.overall || 
+                                    agentMetrics.score;
                 
                 // Filter out overall score from the metrics list
-                const filteredMetrics = Object.entries(categoryMetrics).filter(
+                const filteredMetrics = Object.entries(agentMetrics).filter(
                   ([key]) => !['overall_score', 'overall', 'score'].includes(key)
                 );
                 
                 return (
-                  <div key={categoryId} className="space-y-3">
-                    <h4 className="font-medium text-sm border-b pb-1">{categoryId}</h4>
-                    
-                    {/* Render radar chart if enabled */}
-                    {renderRadarChart(categoryId, categoryMetrics)}
-                    
-                    {filteredMetrics.map(([key, value]) => {
-                      const metricValue = typeof value === 'number' ? { value } : value;
-                      const details = metricDetails?.[key];
-                      
-                      return renderCustomMetric 
-                        ? renderCustomMetric(key, metricValue, details)
-                        : defaultRenderMetric(key, metricValue, details);
-                    })}
-                    
-                    {overallScore && (
-                      <div className="pt-2 border-t">
-                        <div className="flex justify-between">
-                          <span className="font-medium text-xs">Overall Score:</span>
-                          <span className="font-bold text-xs">
-                            {typeof overallScore === 'number' 
-                              ? formatMetricValue(overallScore) 
-                              : formatMetricValue(overallScore.value, overallScore.maxValue || 10)}
-                          </span>
+                  <Card key={agentId} className="mb-4 p-4">
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <h4 className="font-medium mb-2 cursor-help">{agentId}</h4>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold">{agentId}</h4>
+                          {agentBackgrounds[agentId] ? (
+                            <div className="space-y-2 text-sm text-muted-foreground">
+                              {formatAgentBackground(agentBackgrounds[agentId])}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">
+                              No background information available
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      {renderRadarChart(agentId, agentMetrics)}
+                      
+                      {filteredMetrics.map(([key, value]) => {
+                        const metricValue = typeof value === 'number' ? { value } : value;
+                        const details = metricDetails?.[key];
+                        
+                        return renderCustomMetric 
+                          ? renderCustomMetric(key, metricValue, details)
+                          : defaultRenderMetric(key, metricValue, details);
+                      })}
+                      
+                      {overallScore && (
+                        <div className="pt-2 border-t">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-xs">Overall Score:</span>
+                            <span className="font-bold text-xs">
+                              {typeof overallScore === 'number' 
+                                ? formatMetricValue(overallScore) 
+                                : formatMetricValue(overallScore.value, overallScore.maxValue || 10)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
                 );
               })}
             </div>

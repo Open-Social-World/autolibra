@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, createRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,6 +10,24 @@ import { LabeledButton } from "@/components/LabeledButton";
 import { MetricSidebar } from "@/components/MetricSidebar";
 import sotopiaLogo from "../assets/sotopia-logo.png";
 import { useNavigate } from "react-router-dom";
+import TrajectorySearchBar from "@/components/trajectory-searchbar";
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+
 
 interface Label {
   instance_id: string;
@@ -46,6 +64,7 @@ interface ConversationData {
   scenario?: string;
   metrics?: Record<string, MetricData>;
   metric_details?: Record<string, MetricDetails>;
+  agent_backgrounds?: Record<string, string>;
 }
 
 function SotopiaDashboard() {
@@ -58,6 +77,87 @@ function SotopiaDashboard() {
   const [metrics, setMetrics] = useState<Record<string, MetricData> | null>(null);
   const [metricDetails, setMetricDetails] = useState<Record<string, MetricDetails> | null>(null);
   const navigate = useNavigate();
+
+  // Add this new state and function for search functionality
+  const [searchResults, setSearchResults] = useState<Label[]>([]);
+  
+  // Create a map of refs for each trajectory item
+  const [trajectoryRefs, setTrajectoryRefs] = useState<{[key: string]: React.RefObject<HTMLDivElement>}>({});
+  // Ref for the scroll area
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Add state for command dialog
+  const [open, setOpen] = useState(false);
+  
+  // Add a new state for agent backgrounds
+  const [agentBackgrounds, setAgentBackgrounds] = useState<Record<string, string>>({});
+  
+  // Update refs when labels change
+  useEffect(() => {
+    // Create a ref for each label
+    const refs: {[key: string]: React.RefObject<HTMLDivElement>} = {};
+    labels.forEach(label => {
+      refs[label.instance_id] = createRef<HTMLDivElement>();
+    });
+    setTrajectoryRefs(refs);
+  }, [labels]);
+  
+  // Function to handle keyboard shortcut
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+    };
+    
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+  
+  // Function to handle command selection
+  const handleCommandSelect = useCallback((trajectoryId: string) => {
+    fetchConversation(trajectoryId);
+    setOpen(false);
+    
+    // Schedule scrolling to the selected item after a short delay
+    setTimeout(() => {
+      scrollToTrajectory(trajectoryId);
+    }, 100);
+  }, []);
+  
+  // Function to handle trajectory selection from search
+  const handleSelectTrajectory = (trajectory: any) => {
+    // Fetch the conversation data
+    fetchConversation(trajectory.id);
+    
+    // Schedule scrolling to the selected item after a short delay
+    // to ensure the UI has updated
+    setTimeout(() => {
+      scrollToTrajectory(trajectory.id);
+    }, 100);
+  };
+  
+  // Function to scroll to a specific trajectory
+  const scrollToTrajectory = (trajectoryId: string) => {
+    const ref = trajectoryRefs[trajectoryId];
+    if (ref?.current && scrollAreaRef.current) {
+      // Get the scroll container
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        // Calculate position to scroll to
+        const itemTop = ref.current.offsetTop;
+        const containerHeight = scrollContainer.clientHeight;
+        const itemHeight = ref.current.offsetHeight;
+        
+        // Scroll the item into view, centered if possible
+        scrollContainer.scrollTop = itemTop - (containerHeight / 2) + (itemHeight / 2);
+      }
+    }
+  };
+  
+  // Filter labels based on search results or show all if no search results
+  const displayedLabels = searchResults.length > 0 ? searchResults : labels;
 
   useEffect(() => {
     // Fetch labels when component mounts
@@ -82,6 +182,7 @@ function SotopiaDashboard() {
     setScenario("");
     setMetrics(null);
     setMetricDetails(null);
+    setAgentBackgrounds({}); // Reset agent backgrounds
     
     try {
       const response = await fetch(`http://localhost:8000/trajectories/${instanceId}`);
@@ -100,6 +201,10 @@ function SotopiaDashboard() {
         setMetricDetails(data.metric_details);
       }
       
+      if (data.agent_backgrounds) {
+        setAgentBackgrounds(data.agent_backgrounds);
+      }
+      
       setConversationLoading(false);
     } catch (error) {
       console.error(`Error fetching conversation for ${instanceId}:`, error);
@@ -107,6 +212,7 @@ function SotopiaDashboard() {
       setScenario("");
       setMetrics(null);
       setMetricDetails(null);
+      setAgentBackgrounds({});
       setConversationLoading(false);
     }
   }
@@ -217,12 +323,59 @@ function SotopiaDashboard() {
   };
 
   return (
-    <div className="container p-4 mx-auto py-10">
+    <div className="container px-4 mx-auto py-10">
       <Header 
         logo={sotopiaLogo}
         subtitle1={`${labels.length} trajectories`}
         subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
       />
+      
+      {/* Add Command Dialog */}
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <Command>
+          <CommandInput placeholder="Search trajectories..." />
+          <CommandList>
+            <CommandEmpty>No trajectories found.</CommandEmpty>
+            <CommandGroup heading="Trajectories">
+              {labels.map((item) => {
+                const topic = getTopicFromLabel(item.label);
+                const labelParts = item.label.split('|');
+                let agents = "";
+                let date = "";
+                
+                if (labelParts.length >= 3) {
+                  agents = labelParts[0].trim();
+                  date = labelParts[2].trim();
+                }
+                
+                return (
+                  <CommandItem
+                    key={item.instance_id}
+                    onSelect={() => handleCommandSelect(item.instance_id)}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex flex-col">
+                      <span>{topic}</span>
+                      {agents && (
+                        <span className="text-xs text-muted-foreground flex items-center">
+                          <Users className="mr-1 h-3 w-3" />
+                          {agents}
+                        </span>
+                      )}
+                    </div>
+                    {date && (
+                      <span className="text-xs text-muted-foreground">
+                        <Calendar className="mr-1 h-3 w-3 inline" />
+                        {date}
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </CommandDialog>
       
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Left Sidebar - Trajectories */}
@@ -232,7 +385,20 @@ function SotopiaDashboard() {
               <CardTitle>Trajectories</CardTitle>
           </CardHeader>
           <CardContent>
-              <ScrollArea className="h-[70vh]">
+              {/* Add the TrajectorySearchBar component here */}
+              <div className="mb-2">
+                <TrajectorySearchBar 
+                  trajectories={labels.map(label => ({
+                    id: label.instance_id,
+                    title: getTopicFromLabel(label.label),
+                    description: label.label,
+                    timestamp: label.label.split('|')[2]?.trim() || ""
+                  }))}
+                  onSelectTrajectory={handleSelectTrajectory}
+                />
+              </div>
+              
+              <ScrollArea className="h-[60vh]" ref={scrollAreaRef}>
                 {loading ? (
                   // Loading skeletons
                   <div className="space-y-2">
@@ -242,7 +408,7 @@ function SotopiaDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {labels.map((item) => {
+                    {displayedLabels.map((item) => {
                       // Extract topic, agents, and date from the label
                       const topic = getTopicFromLabel(item.label);
                       
@@ -257,15 +423,18 @@ function SotopiaDashboard() {
                       }
                       
                       return (
-                        <LabeledButton
-                          key={item.instance_id}
-                          id={item.instance_id}
-                          topic={topic}
-                          agents={agents}
-                          date={date}
-                          isSelected={selectedInstance === item.instance_id}
-                          onClick={fetchConversation}
-                        />
+                        <div ref={trajectoryRefs[item.instance_id]} key={item.instance_id}>
+                          <LabeledButton
+                            id={item.instance_id}
+                            topic={topic}
+                            agents={agents}
+                            date={date}
+                            isSelected={selectedInstance === item.instance_id}
+                            onClick={(id) => {
+                              fetchConversation(id);
+                            }}
+                          />
+                        </div>
                       );
                     })}
                   </div>
@@ -295,7 +464,7 @@ function SotopiaDashboard() {
                   />
                 </div>
               ) : (
-                <CardTitle className="p-6">Select a conversation</CardTitle>
+                <CardTitle className="p-6">Select a trajectory</CardTitle>
               )}
           </CardHeader>
           <CardContent>
@@ -309,7 +478,7 @@ function SotopiaDashboard() {
               <ScrollArea className="h-[70vh] pr-4">
                 {!selectedInstance ? (
                   <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">Select a conversation from the left panel</p>
+                    <p className="text-muted-foreground">Select a trajectory from the left panel</p>
                   </div>
                 ) : conversationLoading ? (
                   <div className="space-y-4">
@@ -352,6 +521,7 @@ function SotopiaDashboard() {
             title="Metrics"
             metrics={metrics}
             metricDetails={metricDetails}
+            agentBackgrounds={agentBackgrounds}
             isLoading={conversationLoading}
             selectedId={selectedInstance}
             emptyMessage="No metrics available for this conversation"
