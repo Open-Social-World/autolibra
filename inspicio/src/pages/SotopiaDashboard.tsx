@@ -8,7 +8,7 @@ import { Header } from "@/components/Header";
 import { MessageSquare, Users, Calendar } from 'lucide-react';
 import { LabeledButton } from "@/components/LabeledButton";
 import { MetricSidebar } from "@/components/MetricSidebar";
-import sotopiaLogo from "../assets/sotopia-logo.png";
+import sotopiaLogo from "../assets/sotopia.png";
 import { useNavigate } from "react-router-dom";
 import TrajectorySearchBar from "@/components/trajectory-searchbar";
 import {
