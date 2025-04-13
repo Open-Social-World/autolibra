@@ -7,17 +7,11 @@
 Install git lfs if you haven't already. This is required to download the large files in the dataset.
 
 #### From scratch
-For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/osw-eval`. This is for new dataset that you have created.
+For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/osw-eval`. Upload new datasets to this shared repo.
 
 ```bash
 # Download and preprocess <dataset>
 uv run python -m osw_eval_core.datasets.<dataset>
-```
-
-Or run the following from the root of the repo:
-
-```bash
-uv run python -m packages.osw-eval-core.src.osw_eval_core.datasets.balrog_fixed
 ```
 
 #### Download from huggingface
@@ -29,7 +23,7 @@ git clone https://huggingface.co/datasets/open-social-world/osw-eval .data
 #### Upload your data to huggingface
 
 ```bash
-# cd into .datauv run python -m osw_eval_core.datasets.<dataset>
+# cd into .data
 # git add your data
 # git commit -m "Add <dataset>"
 git push
@@ -54,3 +48,5 @@ streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotatio
 ```bash
 uv run python -m osw_eval_core.gen_eval.generator
 ```
+### Run experiments
+Test environments (BALROG, etc) are included as submodules under .gitmodules. Documentation for using these environments are included within each environment repo.
