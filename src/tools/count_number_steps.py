@@ -1,10 +1,18 @@
 import json
 import os
+import argparse
 
+parser = argparse.ArgumentParser(description="Balrog Converter")
+parser.add_argument(
+    "--filename",
+    type=str,
+    required=True,
+    help="The name of the folder containing the Balrog data for the given run in raw",
+)
 
-file_path = ".data/raw/balrog-babaisai_turn_3"
+filename = parser.parse_args().filename
 
-# Walk over all subdirs in the given dir using os.walk
+file_path = f".data/raw/{filename}"
 
 scoresteps = {}
 

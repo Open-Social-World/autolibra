@@ -1,18 +1,11 @@
-import subprocess
-import zipfile
 import json
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 import csv
-import PIL.Image
-import numpy as np
-import ast
-import pickle as pkl
 import shutil
 
-import sys
 
 # Import our dataset classes
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
@@ -26,6 +19,12 @@ class BalrogConverter(BaseConverter):
     def __init__(self, output_path: Path, source_path: Path):
         super().__init__(output_path, source_path)
 
+    def download_data(self) -> None:
+        """Download Balrog dataset files"""
+        self.source_path.mkdir(parents=True, exist_ok=True)
+
+        # This only exists to satisfy the BaseConverter class
+
     @staticmethod
     def clean_csv_file(file_path: Path) -> None:
         """Remove NUL characters from a CSV file."""
@@ -37,58 +36,6 @@ class BalrogConverter(BaseConverter):
         
         with open(file_path, "wb") as f:
             f.write(content)
-
-    def _setup_constants(self) -> None:
-        """Setup Balrog-specific constants, i.e. action space"""
-
-        #TODO: Currently unused, do we need explicit conversion if format already correct?
-
-        # ACTIONS = {
-        #     "north": "move north",
-        #     "east": "move east",
-        #     "south": "move south",
-        #     "west": "move west",
-        #     "northeast": "move northeast",
-        #     "southeast": "move southeast",
-        #     "southwest": "move southwest",
-        #     "northwest": "move northwest",
-        #     "far north": "move far north",
-        #     "far east": "move far east",
-        #     "far south": "move far south",
-        #     "far west": "move far west",
-        #     "far northeast": "move far northeast",
-        #     "far southeast": "move far southeast",
-        #     "far southwest": "move far southwest",
-        #     "far northwest": "move far northwest",
-        #     "up": "go up the stairs",
-        #     "down": "go down the stairs",
-        #     "wait": "rest one move while doing nothing",
-        #     "more": "display more of the message",
-        #     "apply": "apply (use) a tool",
-        #     "close": "close an adjacent door",
-        #     "open": "open an adjacent door",
-        #     "eat": "eat something",
-        #     "force": "force a lock",
-        #     "kick": "kick an enemy or a locked door or chest",
-        #     "loot": "loot a box on the floor",
-        #     "pickup": "pick up things at the current location if there are any",
-        #     "pray": "pray to the gods for help",
-        #     "puton": "put on an accessory",
-        #     "quaff": "quaff (drink) something",
-        #     "search": "search for hidden doors and passages",
-        #     "zap": "zap a wand",
-        # }
-        # self.SPECIAL_KEYS = list(ACTIONS.keys())
-        # self._id2key = (
-        #     self.SPECIAL_KEYS
-        # )
-
-    def download_data(self) -> None:
-        """Download Balrog dataset files"""
-        self.source_path.mkdir(parents=True, exist_ok=True)
-
-        # This assumes that the trajectory file exists and the repo is in its most recent state,
-        # so this shouldn't ever be called
 
     def convert_to_dataset(self) -> None:
         """Convert Balrog data to osw dataset format"""
@@ -108,8 +55,6 @@ class BalrogConverter(BaseConverter):
             base_path=self.output_path,
             description=f"{task} trajectories from Balrog dataset",
         )
-
-        summary_json = json.load(open(summary_path / "summary.json"))
 
         # Get list of all directories within self.source_path
         subtasks: list[str] = [f.name for f in os.scandir(self.source_path) if f.is_dir()]
@@ -212,9 +157,19 @@ class BalrogConverter(BaseConverter):
 
 
 if __name__ == "__main__":
-    # source_path = Path(".data/raw/balrog-minihack_turn_0") # Handle all balrog data in one folder
-    # output_path = Path(".data/minihack_turn_0") # Handle all balrog data in one folder
-    source_path = Path(".data/raw/balrog-minihack_turn_2") # Handle all balrog data in one folder
-    output_path = Path(".data/minihack_turn_2") # Handle all balrog data in one folder
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Balrog Converter")
+    parser.add_argument(
+        "--filename",
+        type=str,
+        required=True,
+        help="The name of the folder containing the Balrog-minihack data for the given run",
+    )
+
+    filename = parser.parse_args().filename
+
+    source_path = Path(f".data/raw/{filename}") # Handle all balrog data in one folder
+    output_path = Path(f".data/{filename.split('-')[-1]}") # Handle all balrog data in one folder
 
     run_converter(BalrogConverter, output_path, source_path)

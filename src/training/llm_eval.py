@@ -105,19 +105,24 @@ async def main(dataset_name: str, metric_path: str) -> None:
     print(f"Coverage: {covered}/{total}")
     print(f"Redundancy: {redundant}/{total_traits}")
 
-
-# if __name__ == "__main__":
-#     asyncio.run(
-#         main(
-#             dataset_name="babaisai_turn_2_mod2",
-#             metric_path=".data/metrics/babaisai_turn_2/03_17_18_08",
-#         ),
-#     )
-
 if __name__ == "__main__":
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Balrog Converter")
+    parser.add_argument(
+        "--filename",
+        type=str,
+        required=True,
+        help="The name of the folder containing the data for the given run, including the date subfolder",
+    )
+
+    filename = parser.parse_args().filename
+    filename_no_date = filename.split("/")[0]
+
     asyncio.run(
         main(
-            dataset_name="babaisai_turn_3",
-            metric_path=".data/metrics/babaisai_turn_3/03_24_18_32",
+            dataset_name=filename_no_date,
+            metric_path=f".data/metrics/{filename}",
         ),
     )

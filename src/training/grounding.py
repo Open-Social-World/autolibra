@@ -98,4 +98,16 @@ async def main(dataset_name: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main("babaisai_turn_2_mod2"))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Balrog Converter")
+    parser.add_argument(
+        "--filename",
+        type=str,
+        required=True,
+        help="The name of the folder containing the data for the given run",
+    )
+
+    filename = parser.parse_args().filename
+
+    asyncio.run(main(filename))

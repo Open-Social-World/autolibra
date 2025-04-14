@@ -1,7 +1,5 @@
 import json
 
-# Load llm_eval_results.jsonl
-
 scores = {}
 for row in open("llm_eval_results.jsonl"):
     data = json.loads(row)
