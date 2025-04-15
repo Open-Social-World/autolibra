@@ -27,6 +27,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import CommentSystem from "@/components/comment-system";
 
 
 interface Label {
@@ -141,6 +142,16 @@ function SotopiaDashboard() {
   const agentIds = selectedInstance && conversation.length > 0
     ? [...new Set(conversation.map(entry => entry.agent_id))]
     : [];
+
+  // Function to format conversation array into a single string for CommentSystem
+  const formatConversationToString = (conv: ConversationEntry[]): string => {
+    if (!conv || conv.length === 0) return "";
+    return conv.map(entry => {
+      // Remove "said: " prefix if present
+      const cleanContent = entry.content.replace(/^said:\s*/, '');
+      return `[${formatTimestamp(entry.timestamp)}] ${entry.agent_id}:\n${cleanContent}`;
+    }).join("\n\n---\n\n"); // Separate messages clearly
+  };
 
   return (
     <div className="container px-4 mx-auto py-10">
@@ -269,15 +280,15 @@ function SotopiaDashboard() {
         </Card>
         </div>
         
-        {/* Middle Panel - Conversation */}
+        {/* Middle Panel - Conversation with CommentSystem */}
         <div className="md:col-span-6">
-        <Card>
-            <CardHeader className="p-0">
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex-shrink-0">
               {selectedInstance ? (
-                <div className="p-6">
+                <div>
                   <Header
                     title={
-                      selectedInstance 
+                      selectedInstance
                         ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label || "Conversation")
                         : "Conversation"
                     }
@@ -289,55 +300,22 @@ function SotopiaDashboard() {
                   />
                 </div>
               ) : (
-                <CardTitle className="p-6">Select a trajectory</CardTitle>
+                <CardTitle>Select a trajectory</CardTitle>
               )}
-          </CardHeader>
-          <CardContent>
               {scenario && (
-                <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-                  <h3 className="text-sm font-medium mb-2">Scenario:</h3>
-                  <p className="text-sm text-muted-foreground">{scenario}</p>
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
+                  <h3 className="font-medium mb-1">Scenario:</h3>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{scenario}</p>
                 </div>
               )}
-              
-              <ScrollArea className="h-[70vh] pr-4">
-                {!selectedInstance ? (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">Select a trajectory from the left panel</p>
-                  </div>
-                ) : conversationLoading ? (
-                  <div className="space-y-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="space-y-2">
-                        <Skeleton className="h-4 w-[100px]" />
-                        <Skeleton className="h-20 w-full" />
-                      </div>
-                    ))}
-                  </div>
-                ) : conversation.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">No conversation data available</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {conversation.map((entry, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{entry.agent_id}</span>
-                        </div>
-                        <div className="pl-4 border-l-2 border-muted-foreground/20">
-                          <p className="whitespace-pre-wrap">
-                            {entry.content.replace(/^said:\s*/, '')}
-                          </p>
-                        </div>
-                        {index < conversation.length - 1 && <Separator className="my-4" />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="flex-grow p-0 overflow-hidden">
+              <CommentSystem
+                initialText={formatConversationToString(conversation)}
+                isLoading={conversationLoading}
+              />
+            </CardContent>
+          </Card>
         </div>
         
         {/* Right Sidebar - Metrics */}
