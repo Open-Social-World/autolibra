@@ -293,11 +293,7 @@ class TTYDataviewer:
             if input().lower() == "q":
                 break
 
-<<<<<<< HEAD
-            console.print("\nPress 'Enter' for next random instance, or 'q' to quit...")
-=======
             console.print("\nPress Enter for next random instance, or 'q' to quit...")
->>>>>>> 51687d14f2e295ba8e0444ad62554dd551354992
             if input().lower() == "q":
                 break
 

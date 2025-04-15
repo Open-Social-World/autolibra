@@ -1,4 +1,4 @@
-# OSW Eval
+# OSW-Eval
 
 ## Contributor doc
 

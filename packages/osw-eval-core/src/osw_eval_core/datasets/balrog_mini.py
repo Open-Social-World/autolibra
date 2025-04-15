@@ -44,9 +44,7 @@ class BalrogConverter(BaseConverter):
         ref_time = datetime.now()  # Used for step_id
 
         # Obtain task from folder name
-        turn = self.source_path.name.split("_")[-1]
         task = self.source_path.name.split("_")[0].split("-")[-1]
-        summary_path = self.source_path
         task = task[0].upper() + task[1:]
 
         # Initialize dataset
