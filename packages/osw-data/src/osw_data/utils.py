@@ -93,7 +93,8 @@ def file_pairs(folder_path: str) -> Generator[Tuple[Path, Path], None, None]:
         if json_file.exists():
             yield csv_file, json_file
 
-def file_pairs_list(folder_path: str) -> Generator[Tuple[Path, Path], None, None]:
+
+def file_pairs_list(folder_path: Path) -> list[tuple[Path, Path]]:
     """
     Generate pairs of CSV and JSON files with matching names from a folder.
 
@@ -103,7 +104,7 @@ def file_pairs_list(folder_path: str) -> Generator[Tuple[Path, Path], None, None
     Yields:
         Tuple of (csv_path, json_path) for matching files
     """
-    path = Path(folder_path)
+    path = folder_path
 
     json_folder = []
 
@@ -113,6 +114,9 @@ def file_pairs_list(folder_path: str) -> Generator[Tuple[Path, Path], None, None
         json_folder.append((csv_file, json_file))
     if json_file.exists():
         return json_folder
+    else:
+        raise FileNotFoundError(f"JSON file not found for {csv_file}")
+
 
 def file_triplets(folder_path: str) -> Generator[Tuple[Path, Path, Path], None, None]:
     """

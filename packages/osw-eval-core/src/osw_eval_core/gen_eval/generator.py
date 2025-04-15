@@ -4,7 +4,7 @@ from typing import Any
 from osw_data.dataset import DataInstance
 from osw_data.metrics import Metric
 from pydantic_ai import Agent
-from pydantic_ai.models.vertexai import VertexAIModel
+from pydantic_ai.models.gemini import GeminiModel
 from importlib import resources
 
 from osw_data import MultiAgentDataset, AnnotationSystem, SymmetricTrajectory
@@ -87,7 +87,7 @@ def get_metrics(dataset_path: Path, annotation_path: Path) -> list[Metric]:
     # Generate the metrics
     prompt = template.render(instances=instances)
 
-    model = VertexAIModel("gemini-2.0-flash-exp")
+    model = GeminiModel("gemini-2.0-flash-exp")
     agent = Agent(model, result_type=list[Metric])
 
     result = agent.run_sync(prompt)
@@ -131,7 +131,7 @@ def propose_metrics(instances: list[MetricTrainingInstance]) -> list[Metric]:
     with open("prompt.txt", "w") as f:
         f.write(prompt)
 
-    model = VertexAIModel("gemini-2.0-flash-exp")
+    model = GeminiModel("gemini-2.0-flash-exp")
     agent = Agent(model, result_type=list[Metric])
 
     result = agent.run_sync(prompt)

@@ -1,7 +1,7 @@
 import asyncio
 from importlib import resources
 import pickle
-from typing import Any, Literal
+from typing import Any, cast
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
@@ -44,7 +44,7 @@ def create_aspect_traits_match_json_schema(
     ]
 
     # Create fields for aspects and traits
-    schema = {}
+    schema: dict[str, Any] = {}  # Apparently required?
     schema["properties"] = {}
     for i in range(len(aspects)):
         # Combine behavior and feedback with properly escaped strings
@@ -65,7 +65,7 @@ def create_aspect_traits_match_json_schema(
     schema["required"] = [f"trait_{i}" for i in range(len(aspects))] + [
         f"aspect_{i}" for i in range(len(aspects))
     ]
-    schema["title"] = "AspectTraitsMatch"
+    schema["title"] = "Aspect and Trait Match"
     schema["type"] = "object"
     schema["additionalProperties"] = False
 
@@ -74,32 +74,34 @@ def create_aspect_traits_match_json_schema(
 
 async def create_aspect_traits_match_pydantic_model(
     aspects: list[BehavirorFeedback], traits: list[Metric]
-) -> BaseModel:
-    fields: dict[str, tuple[type[Literal[str]], Field]] = {}
+) -> type[BaseModel]:  # Matching Pydantic code
+    fields: dict[str, tuple[Any, Any]] = {}
     for i in range(len(aspects)):
+        # Removed Literals as were causing issues, retain Field typing
         fields[f"aspect_{i}"] = (
-            Literal[
-                sanitize_string(aspects[i].feedback)
+            str,
+            Field(
+                title=f"Aspect {i}",
+                description=sanitize_string(aspects[i].feedback)
                 + ": "
-                + sanitize_string(aspects[i].behavior)
-            ],
-            Field(title=f"Aspect {i}"),
+                + sanitize_string(aspects[i].behavior),
+            ),
         )
+
+        trait_literals = [
+            sanitize_string(trait.name) + ": " + sanitize_string(trait.explanation)
+            for trait in traits
+        ] + ["None of the traits matches the aspect."]
 
         fields[f"trait_{i}"] = (
-            Literal[
-                tuple(
-                    sanitize_string(trait.name)
-                    + ": "
-                    + sanitize_string(trait.explanation)
-                    for trait in traits
-                )
-                + ("None of the traits matches the aspect.",)
-            ],
-            Field(title=f"Trait {i}"),
+            str,
+            Field(
+                title=f"Trait {i}",
+                description="Pick one of: " + ", ".join(trait_literals),
+            ),
         )
 
-    return create_model("AspectTraitsMatch", **fields)
+    return cast(type[BaseModel], create_model("AspectTraitsMatch", **fields))
 
 
 async def match_aspects_and_traits(
@@ -119,6 +121,10 @@ async def match_aspects_and_traits(
     while True:
         wait_time = 1
         try:
+            if settings.azure_openai_4o_model is None:
+                raise ValueError(
+                    "Azure OpenAI 4o model is not set in settings, must be provided for aspect-trait matching."
+                )
             completion = await client.beta.chat.completions.parse(
                 model=settings.azure_openai_4o_model,
                 messages=[
@@ -139,6 +145,9 @@ async def match_aspects_and_traits(
             print(aspect_traits_model.model_json_schema())
             print(e)
             raise e
+
+    if completion.choices[0].message.parsed is None:
+        raise ValueError("Failed to parse the response.")
 
     return completion.choices[0].message.parsed
 
@@ -222,7 +231,7 @@ async def run_coverage_eval(
     metrics: list[Metric],
     metric_scoring: list[list[int]],
     instances: list[MetricTrainingInstance],
-):
+) -> list[tuple[int, int, int, int, list[BehavirorFeedback]]]:
     settings = OSWEvalSettings()
 
     client = AsyncAzureOpenAI(

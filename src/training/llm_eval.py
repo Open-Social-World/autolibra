@@ -105,8 +105,8 @@ async def main(dataset_name: str, metric_path: str) -> None:
     print(f"Coverage: {covered}/{total}")
     print(f"Redundancy: {redundant}/{total_traits}")
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Balrog Converter")

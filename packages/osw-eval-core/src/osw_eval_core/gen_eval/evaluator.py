@@ -14,7 +14,7 @@ from osw_data import DataInstance, SymmetricTrajectory, Metric
 from abc import abstractmethod
 
 from pydantic_ai.models import Model
-from pydantic_ai.models.vertexai import VertexAIModel
+from pydantic_ai.models.gemini import GeminiModel
 from openai import AzureOpenAI
 
 from ..configs import OSWEvalSettings
@@ -145,6 +145,12 @@ def llm_evaluation(
         # wait_time = 1
         while True:
             # try:
+
+            if settings.azure_openai_4o_model is None:
+                raise ValueError(
+                    "Azure OpenAI 4o model is not set in settings, must be provided for evaluation."
+                )
+
             result = client.beta.chat.completions.parse(
                 model=settings.azure_openai_4o_model,
                 messages=[
@@ -205,7 +211,7 @@ def evaluate_dataset_with_metrics(
                 quantative_evaluation = ""
                 for metric in metrics:
                     evaluator = LLMasaJudgeEvaluator(
-                        metric=metric, model=VertexAIModel("gemini-1.5-pro")
+                        metric=metric, model=GeminiModel("gemini-1.5-pro")
                     )
                     result = evaluator(
                         data_instance=instance,
@@ -230,7 +236,7 @@ def evaluate_dataset_with_metrics(
                 for i in range(10):
                     try:
                         coverage = Agent(
-                            model=VertexAIModel("gemini-1.5-pro"),
+                            model=GeminiModel("gemini-1.5-pro"),
                             result_type=CoverageEvaluationResult,
                         ).run_sync(user_prompt=coverage_prompt)
                         break

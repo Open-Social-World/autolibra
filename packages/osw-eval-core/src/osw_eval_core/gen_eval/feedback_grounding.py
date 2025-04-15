@@ -48,6 +48,10 @@ async def feedback_grounding(
     wait_time = 1
     while True:
         try:
+            if settings.azure_openai_4o_model is None:
+                raise ValueError(
+                    "Azure OpenAI 4o model is not set in settings, must be provided for feedback grounding."
+                )
             completion = await client.beta.chat.completions.parse(
                 model=settings.azure_openai_4o_model,
                 messages=[

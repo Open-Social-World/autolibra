@@ -6,7 +6,6 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
 import json
-import time
 
 from osw_data.annotation import AnnotationSystem, AnnotationSpan
 from osw_data.dataset import MultiAgentDataset

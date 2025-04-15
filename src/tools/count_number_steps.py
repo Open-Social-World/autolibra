@@ -20,16 +20,15 @@ for root, dirs, files in os.walk(file_path):
     json_files = [f for f in files if f.endswith(".json") and "summary" not in f]
 
     for ind_file in json_files:
-
         with open(os.path.join(root, ind_file), "r") as f:
             data = json.load(f)
-            task = data['task']
+            task = data["task"]
 
             if task not in scoresteps:
-                scoresteps[task] = [data['num_steps'], data['episode_return'], 1]
+                scoresteps[task] = [data["num_steps"], data["episode_return"], 1]
             else:
-                scoresteps[task][0] += data['num_steps']
-                scoresteps[task][1] += data['episode_return']
+                scoresteps[task][0] += data["num_steps"]
+                scoresteps[task][1] += data["episode_return"]
                 scoresteps[task][2] += 1
 
 net_avg_steps = 0

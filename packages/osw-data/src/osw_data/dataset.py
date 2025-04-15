@@ -173,8 +173,10 @@ class MultiAgentDataset:
 
         with open(instance_path / "metadata.json", "r") as f:
             return DataInstance.model_validate_json(f.read())
-        
-    def update_instance_metadata(self, instance_id: str, new_meta: dict[str, Any]) -> None:
+
+    def update_instance_metadata(
+        self, instance_id: str, new_meta: dict[str, Any]
+    ) -> None:
         """Update metadata for a specific instance"""
         inst = self.get_instance_metadata(instance_id)
         inst.metadata.update(new_meta)

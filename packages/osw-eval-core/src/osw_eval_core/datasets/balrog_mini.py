@@ -2,7 +2,6 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Any
 import csv
 import shutil
 
@@ -11,7 +10,7 @@ import shutil
 from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from osw_data.utils import file_pairs
+
 
 class BalrogConverter(BaseConverter):
     """Handles downloading and converting Balrog data to our dataset format"""
@@ -30,10 +29,10 @@ class BalrogConverter(BaseConverter):
         """Remove NUL characters from a CSV file."""
         with open(file_path, "rb") as f:
             content = f.read()
-        
+
         # Remove NUL characters
-        content = content.replace(b'\x00', b'')
-        
+        content = content.replace(b"\x00", b"")
+
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -55,7 +54,9 @@ class BalrogConverter(BaseConverter):
         )
 
         # Get list of all directories within self.source_path
-        subtasks: list[str] = [f.name for f in os.scandir(self.source_path) if f.is_dir()]
+        subtasks: list[str] = [
+            f.name for f in os.scandir(self.source_path) if f.is_dir()
+        ]
 
         # Iterate over folders in task_dir
         for subtask in subtasks:
@@ -65,13 +66,26 @@ class BalrogConverter(BaseConverter):
             for suffix in ["00", "01", "02"]:
                 # Construct file paths for the current group
                 gif_path = subtask_dir / f"episode_{suffix}.gif"
-                csv_path = subtask_dir / f"{subtask}_run_{suffix}.csv"  # Use subtask name + _run_ + suffix
-                json_path = subtask_dir / f"{subtask}_run_{suffix}.json"  # Use subtask name + _run_ + suffix
-                pkl_path = subtask_dir / f"{subtask}_run_{suffix}.pkl"  # Use subtask name + _run_ + suffix
+                csv_path = (
+                    subtask_dir / f"{subtask}_run_{suffix}.csv"
+                )  # Use subtask name + _run_ + suffix
+                json_path = (
+                    subtask_dir / f"{subtask}_run_{suffix}.json"
+                )  # Use subtask name + _run_ + suffix
+                pkl_path = (
+                    subtask_dir / f"{subtask}_run_{suffix}.pkl"
+                )  # Use subtask name + _run_ + suffix
 
                 # Check if all required files exist for this group
-                if not (gif_path.exists() and csv_path.exists() and json_path.exists() and pkl_path.exists()):
-                    self.logger.warning(f"Missing files for suffix {suffix} in {subtask_dir}")
+                if not (
+                    gif_path.exists()
+                    and csv_path.exists()
+                    and json_path.exists()
+                    and pkl_path.exists()
+                ):
+                    self.logger.warning(
+                        f"Missing files for suffix {suffix} in {subtask_dir}"
+                    )
                     continue
 
                 # Clean the CSV file before processing
@@ -85,7 +99,7 @@ class BalrogConverter(BaseConverter):
                     "agent": AgentMetadata(
                         agent_id="agent",
                         agent_type="game_agent",
-                        capabilities=["navigation", "interaction"]
+                        capabilities=["navigation", "interaction"],
                     )
                 }
 
@@ -97,40 +111,42 @@ class BalrogConverter(BaseConverter):
 
                 # Create a unique instance ID for this group
                 instance_id = dataset.create_instance(
-                    agents_metadata=agents_metadata,
-                    instance_metadata=instance_metadata
+                    agents_metadata=agents_metadata, instance_metadata=instance_metadata
                 )
                 self.logger.info(f"Created instance {instance_id} for suffix {suffix}")
 
                 # Copy GIF to output path
-                gif_out_path = self.output_path / "instances" / instance_id / f"episode_{suffix}.gif"
+                gif_out_path = (
+                    self.output_path
+                    / "instances"
+                    / instance_id
+                    / f"episode_{suffix}.gif"
+                )
                 shutil.copy(gif_path, gif_out_path)
 
                 # Update instance metadata with GIF path
-                add_gif = {'gif_path': gif_out_path}
-                dataset.update_instance_metadata(instance_id=instance_id, new_meta=add_gif)
+                add_gif = {"gif_path": gif_out_path}
+                dataset.update_instance_metadata(
+                    instance_id=instance_id, new_meta=add_gif
+                )
 
                 # Process the CSV file
                 with open(csv_path, newline="") as f:
                     reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
                     next(reader)  # Skip header
                     for line in reader:
-                        line = [field.replace('\n', ' ').replace('\r', '') for field in line]
+                        line = [
+                            field.replace("\n", " ").replace("\r", "") for field in line
+                        ]
 
-                        step_id = line[0]
-                        step_id = ref_time + timedelta(seconds=int(step_id))
+                        step_id = ref_time + timedelta(seconds=int(line[0]))
                         actions = line[1]
                         reasoning = line[2]
                         observations = line[3]
 
-                        act_obj = {
-                            "reasoning": reasoning,
-                            "text": actions
-                        }
+                        act_obj = {"reasoning": reasoning, "text": actions}
 
-                        obs_obj = {
-                            "observations": observations
-                        }
+                        obs_obj = {"observations": observations}
 
                         dataset.add_data_point(
                             instance_id=instance_id,
@@ -167,7 +183,9 @@ if __name__ == "__main__":
 
     filename = parser.parse_args().filename
 
-    source_path = Path(f".data/raw/{filename}") # Handle all balrog data in one folder
-    output_path = Path(f".data/{filename.split('-')[-1]}") # Handle all balrog data in one folder
+    source_path = Path(f".data/raw/{filename}")  # Handle all balrog data in one folder
+    output_path = Path(
+        f".data/{filename.split('-')[-1]}"
+    )  # Handle all balrog data in one folder
 
     run_converter(BalrogConverter, output_path, source_path)

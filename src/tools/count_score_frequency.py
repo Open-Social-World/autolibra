@@ -18,7 +18,7 @@ for row in open("llm_eval_results.jsonl"):
 # Remove [0,0,0] entries, as these are purely text
 scores = {key: val for key, val in scores.items() if sum(val) > 0}
 
-for key,val in scores.items():
+for key, val in scores.items():
     print(key, val)
 
 # Print number of total scores
