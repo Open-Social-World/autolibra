@@ -1,4 +1,5 @@
 import asyncio
+import json
 from openai import AsyncAzureOpenAI
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
@@ -38,14 +39,17 @@ async def main(dataset_name: str, metric_path: str) -> None:
     )
 
     metric_training_instances: list[MetricTrainingInstance] = []
+    # Keep track of instance_id and agent_id for each training instance
+    instance_agent_mapping: list[tuple[str, str]] = []
 
     for instances in dataset.list_instances():
         instance = dataset.get_instance_metadata(instances)
         for agent_id in instance.agents:
             trajectory_annotations = annotation_system.get_trajectory_annotations(
-                instance_id=instances, agent_id=agent_id
+                    instance_id=instances, agent_id=agent_id
             )
-            for annotation in trajectory_annotations.annotations:
+            # If there are no annotations
+            if not trajectory_annotations.annotations: 
                 metric_training_instances.append(
                     MetricTrainingInstance(
                         task=instance.metadata["task"]
@@ -53,9 +57,25 @@ async def main(dataset_name: str, metric_path: str) -> None:
                         else "Task is described in the trajectory observation",
                         agent_id=agent_id,
                         trajectory=dataset.get_trajectory(instances, agent_id),
-                        feedback=str(annotation.content),
+                        feedback="No feedback provided.",
                     )
                 )
+                instance_agent_mapping.append((instances, agent_id))
+            # If there are annotations 
+            else:   
+                for annotation in trajectory_annotations.annotations:
+                    metric_training_instances.append(
+                        MetricTrainingInstance(
+                            task=instance.metadata["task"]
+                            if "task" in instance.metadata
+                            else "Task is described in the trajectory observation",
+                            agent_id=agent_id,
+                            trajectory=dataset.get_trajectory(instances, agent_id),
+                            feedback=str(annotation.content),
+                        )
+                    )
+                    instance_agent_mapping.append((instances, agent_id))
+            
 
     eval_results = await run_llm_eval(
         metric_training_instances, list(metric_set.metrics.values()), client=client
@@ -70,8 +90,14 @@ async def main(dataset_name: str, metric_path: str) -> None:
     ]
 
     with open("llm_eval_results.jsonl", "w") as f:
-        for eval_result in eval_results:
-            f.write(eval_result.model_dump_json())
+        for i, eval_result in enumerate(eval_results):
+            # Add instance_id and agent_id to each result
+            instance_id, agent_id = instance_agent_mapping[i]
+            result_dict = eval_result.model_dump()
+            result_dict["instance_id"] = instance_id
+            result_dict["agent_id"] = agent_id
+            
+            f.write(json.dumps(result_dict))
             f.write("\n")
 
     traits = [
@@ -106,10 +132,11 @@ async def main(dataset_name: str, metric_path: str) -> None:
     print(f"Redundancy: {redundant}/{total_traits}")
 
 
+
 if __name__ == "__main__":
     asyncio.run(
         main(
-            dataset_name="cogym",
-            metric_path=".data/metrics/cogym/02_18_17_22",
+            dataset_name="sotopia",
+            metric_path=".data/metrics/sotopia/8_metrics",
         ),
     )

@@ -87,22 +87,101 @@ def get_label():
     
     return result
 
-@app.get("/metrics")
-def get_metrics():
-    """Get all available metrics with their descriptions"""
-    if not metric_set:
-        return []
+@app.get("/metrics/instances")
+def get_metrics_by_instance():
+    """Get a mapping of instance IDs to their available metrics"""
+    metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
     
-    result = []
-    for metric_name, metric in metric_set.metrics.items():
-        result.append({
-            "name": metric_name,
-            "explanation": metric.explanation,
-            "good_behaviors": metric.good_behaviors,
-            "bad_behaviors": metric.bad_behaviors
-        })
+    if not metrics_file.exists():
+        logger.warning(f"Metrics file not found at {metrics_file}")
+        return {}
     
-    return result
+    # Create a mapping of instance_id -> agent_id -> metrics
+    instance_metrics = {}
+    
+    try:
+        with open(metrics_file, "r") as f:
+            for line in f:
+                try:
+                    metric_data = json.loads(line)
+                    instance_id = metric_data.get("instance_id")
+                    agent_id = metric_data.get("agent_id")
+                    
+                    if not instance_id or not agent_id:
+                        continue
+                    
+                    # Initialize the instance entry if it doesn't exist
+                    if instance_id not in instance_metrics:
+                        instance_metrics[instance_id] = {}
+                    
+                    # Initialize the agent entry if it doesn't exist
+                    if agent_id not in instance_metrics[instance_id]:
+                        instance_metrics[instance_id][agent_id] = {
+                            "metrics": {},
+                            "reasoning": {}
+                        }
+                    
+                    # Extract metric scores and reasoning
+                    for key, value in metric_data.items():
+                        if isinstance(value, int) and key not in ["instance_id", "agent_id"]:
+                            instance_metrics[instance_id][agent_id]["metrics"][key] = value
+                        elif key.endswith("_reasoning") and isinstance(value, str):
+                            metric_name = key.replace("_reasoning", "")
+                            instance_metrics[instance_id][agent_id]["reasoning"][metric_name] = value
+                            
+                except json.JSONDecodeError:
+                    logger.error(f"Error parsing JSON from metrics file")
+                    continue
+    except Exception as e:
+        logger.error(f"Error reading metrics file: {str(e)}")
+        return {}
+    
+    return instance_metrics
+
+@app.get("/api/instances/{instance_id}/metrics/{agent_id}")
+async def get_instance_agent_metrics(instance_id: str, agent_id: str):
+    """Get metrics for a specific agent within a specific instance."""
+    logger.info(f"Attempting to get metrics for instance='{instance_id}', agent='{agent_id}'")
+    metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
+
+    if not metrics_file.exists():
+        logger.warning(f"Metrics file not found at {metrics_file} for instance {instance_id}, agent {agent_id}")
+        raise HTTPException(status_code=404, detail="Metrics file not found")
+
+    try:
+        line_number = 0
+        with open(metrics_file, "r") as f:
+            for line in f:
+                line_number += 1
+                try:
+                    metric_data = json.loads(line)
+                    file_instance_id = metric_data.get("instance_id")
+                    file_agent_id = metric_data.get("agent_id")
+
+                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}', agent='{agent_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
+                    ids_match = file_instance_id == instance_id
+                    agents_match = file_agent_id == agent_id
+                    logger.debug(f"Line {line_number}: Instance match: {ids_match}, Agent match: {agents_match}")
+
+                    if ids_match and agents_match:
+                        logger.info(f"Found match on line {line_number} for instance='{instance_id}', agent='{agent_id}'")
+                        response_data = {}
+                        for key, value in metric_data.items():
+                             if isinstance(value, int) or (key.endswith("_reasoning") and isinstance(value, str)):
+                                 response_data[key] = value
+                        response_data["instance_id"] = instance_id
+                        response_data["agent_id"] = agent_id
+                        return response_data
+                except json.JSONDecodeError:
+                    logger.error(f"Error parsing JSON on line {line_number} in metrics file: {line.strip()}")
+                    continue
+
+        logger.warning(f"Metrics search completed. No match found for instance {instance_id}, agent {agent_id} after checking {line_number} lines.")
+        raise HTTPException(status_code=404, detail="Metrics not found for this instance/agent combination")
+
+    except Exception as e:
+        logger.error(f"Error reading metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error reading metrics")
 
 @app.get("/trajectories/{instance_id}")
 def get_trajectory(instance_id: str):
@@ -133,7 +212,6 @@ def get_trajectory(instance_id: str):
         
         # Extract metrics and agent backgrounds in a single pass
         metrics = {}
-        metric_details = {}
         agent_backgrounds = {}
         
         if metadata:
@@ -143,25 +221,7 @@ def get_trajectory(instance_id: str):
                     if hasattr(agent_data, "parameters") and isinstance(agent_data.parameters, dict):
                         if "background" in agent_data.parameters:
                             agent_backgrounds[agent_id] = agent_data.parameters["background"]
-            
-            # Extract metrics from metadata
-            if hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
-                if "rewards" in metadata.metadata and isinstance(metadata.metadata["rewards"], list):
-                    for i, reward in enumerate(metadata.metadata["rewards"]):
-                        agent_id = list(metadata.agents.keys())[i] if i < len(metadata.agents) else f"Agent {i+1}"
-                        metrics[agent_id] = reward
-                        
-                        # Process each metric to get its details
-                        if metric_set:
-                            for metric_name in reward.keys():
-                                normalized_name = metric_name.replace("/", "_")  # Match the normalization in Metric class
-                                if normalized_name in metric_set.metrics:
-                                    metric = metric_set.metrics[normalized_name]
-                                    metric_details[metric_name] = {
-                                        "explanation": metric.explanation,
-                                        "good_behaviors": metric.good_behaviors,
-                                        "bad_behaviors": metric.bad_behaviors
-                                    }
+        
         
         # Get trajectory data
         conversation = []
@@ -212,8 +272,6 @@ def get_trajectory(instance_id: str):
             "instance_id": instance_id,
             "conversation": conversation,
             "scenario": scenario,
-            "metrics": metrics,
-            "metric_details": metric_details,
             "agent_backgrounds": agent_backgrounds
         }
     except Exception as e:
