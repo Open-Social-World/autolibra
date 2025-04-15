@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp } from "lucide-react";
-import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -13,6 +12,12 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 interface MetricResult {
   goal_achievement_and_outcome_effectiveness: number;
@@ -106,51 +111,6 @@ const MetricSidebar = ({ instanceId, agentId }: MetricSidebarProps) => {
     fetchMetrics();
   }, [instanceId, agentId]);
 
-  const radarData = metrics
-    ? [
-        {
-          subject: "Goal",
-          A: metrics.goal_achievement_and_outcome_effectiveness,
-          fullMark: 1,
-        },
-        {
-          subject: "Conversation",
-          A: metrics.conversational_naturalness_and_efficiency,
-          fullMark: 1,
-        },
-        {
-          subject: "Personality",
-          A: metrics.personality_consistency_and_alignment,
-          fullMark: 1,
-        },
-        {
-          subject: "Negotiation",
-          A: metrics.negotiation_tactics_and_strategic_adaptability,
-          fullMark: 1,
-        },
-        {
-          subject: "Context",
-          A: metrics.contextual_integration_of_identity_and_personal_background,
-          fullMark: 1,
-        },
-        {
-          subject: "Clarity",
-          A: metrics.clarity_and_precision_in_communication,
-          fullMark: 1,
-        },
-        {
-          subject: "Responsiveness",
-          A: metrics.responsiveness_and_conversational_termination,
-          fullMark: 1,
-        },
-        {
-          subject: "Adaptability",
-          A: metrics.adaptability_and_flexibility_in_dialogue,
-          fullMark: 1,
-        },
-      ]
-    : [];
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -163,69 +123,42 @@ const MetricSidebar = ({ instanceId, agentId }: MetricSidebarProps) => {
         <ScrollArea>
           {loading ? (
             <div className="space-y-4 p-4">
-              <Skeleton className="h-[200px] w-full" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-2/3" />
             </div>
           ) : error ? (
-            <div className="text-destructive p-4 text-center flex items-center justify-center">
+            <div className="text-destructive p-4 text-center flex items-center justify-center h-full">
               {error}
             </div>
           ) : metrics ? (
-            <div className="space-y-6 p-4">
-              <div className="flex justify-center">
-                <ChartContainer config={chartConfig}>
-                  <RadarChart 
-                    width={300} 
-                    height={300} 
-                    data={radarData}
-                    margin={{ top: 10, right: 30, bottom: 10, left: 30 }}
-                  >
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="subject" />
-                    <Radar
-                      name="Performance"
-                      dataKey="A"
-                      stroke="#8884d8"
-                      fill="#8884d8"
-                      fillOpacity={0.6}
-                    />
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
-                    />
-                  </RadarChart>
-                </ChartContainer>
-              </div>
+            <div className="p-2">
+              <Accordion type="single" collapsible className="w-full space-y-2">
+                {Object.entries(metricLabels).map(([key, label]) => {
+                  const score = metrics[key as keyof MetricResult];
+                  const reasoning = metrics[`${key}_reasoning` as keyof MetricResult] as string;
+                  const scoreSymbol = score === 1 ? "✓" : score === 0 ? "−" : "✗";
 
-              <div className="space-y-4">
-                {Object.entries(metricLabels).map(([key, label]) => (
-                  <div key={key} className="space-y-1">
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <div className="flex justify-between items-center cursor-help">
-                          <span className="text-sm font-medium">{label}</span>
-                          <span className="text-sm font-bold">
-                            {metrics[key as keyof MetricResult] === 1 ? "✓" : 
-                             metrics[key as keyof MetricResult] === 0 ? "−" : "✗"}
+                  return (
+                    <AccordionItem value={key} key={key} className="border rounded-md px-3">
+                      <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
+                        <div className="flex justify-between items-center w-full pr-2">
+                          <span>{label}</span>
+                          <span className={`font-bold ${score === 1 ? 'text-green-600' : score === 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                            {scoreSymbol}
                           </span>
                         </div>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-semibold">{label}</h4>
-                          <p className="text-xs">
-                            {metrics[`${key}_reasoning` as keyof MetricResult] as string}
-                          </p>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </div>
-                ))}
-              </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-xs pt-1 pb-3">
+                        {reasoning || "No reasoning provided."}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             </div>
           ) : (
-            <div className="text-muted-foreground text-center p-4 flex items-center justify-center">
+            <div className="text-muted-foreground text-center p-4 flex items-center justify-center h-full">
               {instanceId && agentId ? 'Loading metrics...' : 'Select an instance and agent to view metrics'}
             </div>
           )}
