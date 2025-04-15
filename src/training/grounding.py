@@ -12,19 +12,19 @@
 import asyncio
 from datetime import datetime
 from openai import AsyncAzureOpenAI
-from osw_data import MultiAgentDataset
-from osw_data.annotation import AnnotationSystem
-from osw_data.metrics import MetricSet
-from osw_eval_core import (
+from autolibra_data import MultiAgentDataset
+from autolibra_data.annotation import AnnotationSystem
+from autolibra_data.metrics import MetricSet
+from autolibra_eval_core import (
     MetricTrainingInstance,
     feedback_grounding,
     behavior_clustering,
 )
-from osw_eval_core.configs import OSWEvalSettings
+from autolibra_eval_core.configs import AutoLibraEvalSettings
 
 
 async def main(dataset_name: str) -> None:
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     client = AsyncAzureOpenAI(
         api_key=settings.azure_api_key,

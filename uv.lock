@@ -9,9 +9,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "osw-data",
-    "osw-eval",
-    "osw-eval-core",
+    "autolibra-data",
+    "autolibra-eval",
+    "autolibra-eval-core",
 ]
 
 [[package]]
@@ -1358,9 +1358,9 @@ wheels = [
 ]
 
 [[package]]
-name = "osw-data"
+name = "autolibra-data"
 version = "0.0.1"
-source = { editable = "packages/osw-data" }
+source = { editable = "packages/autolibra-data" }
 dependencies = [
     { name = "numpy" },
     { name = "pydantic" },
@@ -1379,13 +1379,13 @@ requires-dist = [
 ]
 
 [[package]]
-name = "osw-eval"
+name = "autolibra-eval"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "logfire" },
-    { name = "osw-eval-core", extra = ["sotopia", "webarena"] },
+    { name = "autolibra-eval-core", extra = ["sotopia", "webarena"] },
     { name = "pandas" },
     { name = "pydantic-settings" },
     { name = "rich" },
@@ -1415,7 +1415,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.6" },
     { name = "logfire", specifier = ">=3.7.1" },
     { name = "marimo", marker = "extra == 'notebook'", specifier = ">=0.10" },
-    { name = "osw-eval-core", extras = ["webarena", "sotopia"], editable = "packages/osw-eval-core" },
+    { name = "autolibra-eval-core", extras = ["webarena", "sotopia"], editable = "packages/autolibra-eval-core" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic-settings", specifier = ">=2.7.1" },
     { name = "rich", specifier = ">=13.9.4" },
@@ -1437,13 +1437,13 @@ dev = [
 ]
 
 [[package]]
-name = "osw-eval-core"
+name = "autolibra-eval-core"
 version = "0.1.0"
-source = { editable = "packages/osw-eval-core" }
+source = { editable = "packages/autolibra-eval-core" }
 dependencies = [
     { name = "jinja2" },
     { name = "numpy" },
-    { name = "osw-data" },
+    { name = "autolibra-data" },
     { name = "polars" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
@@ -1468,7 +1468,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'sotopia'", specifier = ">=0.27.1" },
     { name = "jinja2", specifier = ">=3.1.5" },
     { name = "numpy", specifier = ">=1.9.3" },
-    { name = "osw-data", editable = "packages/osw-data" },
+    { name = "autolibra-data", editable = "packages/autolibra-data" },
     { name = "pillow", marker = "extra == 'webarena'", specifier = ">=11.1.0" },
     { name = "polars", specifier = ">=1.19.0" },
     { name = "pydantic", specifier = ">=2.7" },

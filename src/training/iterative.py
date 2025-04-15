@@ -12,18 +12,18 @@
 import asyncio
 from datetime import datetime
 from openai import AsyncAzureOpenAI
-from osw_data import Metric, MultiAgentDataset, MetricSet
-from osw_data.annotation import AnnotationSystem
-from osw_eval_core import run_llm_eval, behavior_clustering, feedback_grounding
-from osw_eval_core.data import MetricTrainingInstance, Trait
-from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
-from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
+from autolibra_data import Metric, MultiAgentDataset, MetricSet
+from autolibra_data.annotation import AnnotationSystem
+from autolibra_eval_core import run_llm_eval, behavior_clustering, feedback_grounding
+from autolibra_eval_core.data import MetricTrainingInstance, Trait
+from autolibra_eval_core.configs import AutoLibraEvalSettings
+from autolibra_eval_core.evaluators.coverage_evaluator import run_coverage_eval
+from autolibra_eval_core.evaluators.llm_evaluator import _make_snake_case
 import logfire
 
 
 async def iterative_metric_creation(dataset_name: str) -> list[Metric]:
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     dataset = MultiAgentDataset(
         name="dataset",

@@ -1,4 +1,4 @@
-from osw_data import AnnotationSystem
+from autolibra_data import AnnotationSystem
 import rich
 
 if __name__ == "__main__":

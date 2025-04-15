@@ -1,16 +1,16 @@
 import asyncio
 from openai import AsyncAzureOpenAI
-from osw_data import MultiAgentDataset
-from osw_data.annotation import AnnotationSystem
-from osw_data.metrics import MetricSet
-from osw_eval_core import (
+from autolibra_data import MultiAgentDataset
+from autolibra_data.annotation import AnnotationSystem
+from autolibra_data.metrics import MetricSet
+from autolibra_eval_core import (
     run_llm_eval,
 )
-from osw_eval_core.data import MetricTrainingInstance
-from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.data.primitives import Trait
-from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
-from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
+from autolibra_eval_core.data import MetricTrainingInstance
+from autolibra_eval_core.configs import AutoLibraEvalSettings
+from autolibra_eval_core.data.primitives import Trait
+from autolibra_eval_core.evaluators.coverage_evaluator import run_coverage_eval
+from autolibra_eval_core.evaluators.llm_evaluator import _make_snake_case
 
 
 async def main(dataset_name: str, metric_path: str) -> None:
@@ -29,7 +29,7 @@ async def main(dataset_name: str, metric_path: str) -> None:
         induced_from=dataset_name,
     )
 
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     client = AsyncAzureOpenAI(
         api_key=settings.azure_api_key,

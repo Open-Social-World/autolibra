@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 from datetime import datetime
 import typer
-from osw_data.annotation import AnnotationSystem
+from autolibra_data.annotation import AnnotationSystem
 from rich.console import Console
 from typing import List, Dict, Any
 
@@ -143,7 +143,7 @@ def streamlit_main(annotations_dir: Path) -> None:
         st.info(
             "Please provide the full path to the annotations directory. For example:\n\n"
             "```bash\n"
-            "osw-eval view-annotations .data/annotations/sotopia/annotations\n"
+            "autolibra-eval view-annotations .data/annotations/sotopia/annotations\n"
             "```"
         )
         return
