@@ -18,6 +18,7 @@ dependencies = [
     "streamlit>=1.43",
     "pandas>=2.2",
     "logfire>=3.7.1",
+    "matplotlib>=3.10.1",
 ]
 
 [tool.uv]
@@ -51,4 +52,3 @@ packages = ["src/osw_data"]
 
 [tool.pylsp-mypy]
 enabled = true
-overrides = ["--python-executable", ".venv/bin/python", true]
