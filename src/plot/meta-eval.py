@@ -167,10 +167,10 @@ for i, (dataset_name, dataset) in enumerate(datasets.items()):
     ax.grid(True, linestyle="--", alpha=0.7)
 
 # Adjust layout before adding colorbar
-plt.tight_layout(rect=[0, 0, 0.9, 1])  # Make room for the colorbar
+plt.tight_layout(rect=(0, 0, 0.9, 1))  # Make room for the colorbar
 
 # Add a common colorbar to the figure
-cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])  # [left, bottom, width, height]
+cbar_ax = fig.add_axes((0.92, 0.15, 0.02, 0.7))  # [left, bottom, width, height]
 cbar = fig.colorbar(scatters[0], cax=cbar_ax)
 
 # Position N label under the colorbar
