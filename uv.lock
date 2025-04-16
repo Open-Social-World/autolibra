@@ -111,7 +111,7 @@ wheels = [
 [[package]]
 name = "autolibra-core"
 version = "0.1.0"
-source = { editable = "packages/autolibra-eval-core" }
+source = { editable = "packages/autolibra-core" }
 dependencies = [
     { name = "jinja2" },
     { name = "numpy" },
@@ -187,7 +187,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "autolibra-core", extras = ["webarena", "sotopia"], editable = "packages/autolibra-eval-core" },
+    { name = "autolibra-core", extras = ["webarena", "sotopia"], editable = "packages/autolibra-core" },
     { name = "fastapi", specifier = ">=0.115.6" },
     { name = "logfire", specifier = ">=3.7.1" },
     { name = "marimo", marker = "extra == 'notebook'", specifier = ">=0.10" },
