@@ -6,7 +6,9 @@ from autolibra_eval_core.data.primitives import MetricTrainingInstance
 
 
 def load_prompt_template(jinja_file: str) -> jinja2.Template:
-    with resources.files("autolibra_eval_core.templates").joinpath(jinja_file).open("r") as f:
+    with resources.files("autolibra_eval_core.templates").joinpath(jinja_file).open(
+        "r"
+    ) as f:
         return jinja2.Template(f.read())
 
 
