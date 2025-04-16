@@ -1,4 +1,8 @@
-# AutoLibra-Eval
+# AutoLibra ⚖️ Metric Induction for Agents from Open-Ended Human Feedback
+
+## Introduction
+
+AutoLibra is designed to facilitate the evaluation of agents through metrics derived from human feedback. This document outlines the steps for contributors to prepare data, annotate it, and run experiments.
 
 ## Contributor doc
 
