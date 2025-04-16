@@ -1,4 +1,6 @@
-# OSW Eval
+# AutoLibra ⚖️ Metric Induction for Agents from Open-Ended Human Feedback
+
+## Introduction
 
 ## Contributor doc
 
