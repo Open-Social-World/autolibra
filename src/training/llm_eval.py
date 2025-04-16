@@ -3,14 +3,14 @@ from openai import AsyncAzureOpenAI
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
 from osw_data.metrics import MetricSet
-from osw_eval_core import (
+from autolibra_core import (
     run_llm_eval,
 )
-from osw_eval_core.data import MetricTrainingInstance
-from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.data.primitives import Trait
-from osw_eval_core.evaluators.coverage_evaluator import run_coverage_eval
-from osw_eval_core.evaluators.llm_evaluator import _make_snake_case
+from autolibra_core.data import MetricTrainingInstance
+from autolibra_core.configs import AutoLibraEvalSettings
+from autolibra_core.data.primitives import Trait
+from autolibra_core.evaluators.coverage_evaluator import run_coverage_eval
+from autolibra_core.evaluators.llm_evaluator import _make_snake_case
 
 
 async def main(dataset_name: str, metric_path: str) -> None:
@@ -29,7 +29,7 @@ async def main(dataset_name: str, metric_path: str) -> None:
         induced_from=dataset_name,
     )
 
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     client = AsyncAzureOpenAI(
         api_key=settings.azure_api_key,
@@ -107,9 +107,22 @@ async def main(dataset_name: str, metric_path: str) -> None:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Balrog Converter")
+    parser.add_argument(
+        "--filename",
+        type=str,
+        required=True,
+        help="The name of the folder containing the data for the given run, including the date subfolder",
+    )
+
+    filename = parser.parse_args().filename
+    filename_no_date = filename.split("/")[0]
+
     asyncio.run(
         main(
-            dataset_name="cogym",
-            metric_path=".data/metrics/cogym/02_18_17_22",
+            dataset_name=filename_no_date,
+            metric_path=f".data/metrics/{filename}",
         ),
     )

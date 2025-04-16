@@ -15,16 +15,16 @@ from openai import AsyncAzureOpenAI
 from osw_data import MultiAgentDataset
 from osw_data.annotation import AnnotationSystem
 from osw_data.metrics import MetricSet
-from osw_eval_core import (
+from autolibra_core import (
     MetricTrainingInstance,
     feedback_grounding,
     behavior_clustering,
 )
-from osw_eval_core.configs import OSWEvalSettings
+from autolibra_core.configs import AutoLibraEvalSettings
 
 
 async def main(dataset_name: str) -> None:
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     client = AsyncAzureOpenAI(
         api_key=settings.azure_api_key,
@@ -98,4 +98,16 @@ async def main(dataset_name: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main("cogym"))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Balrog Converter")
+    parser.add_argument(
+        "--filename",
+        type=str,
+        required=True,
+        help="The name of the folder containing the data for the given run",
+    )
+
+    filename = parser.parse_args().filename
+
+    asyncio.run(main(filename))

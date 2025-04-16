@@ -1,4 +1,8 @@
-# OSW Eval
+# AutoLibra ⚖️ Metric Induction for Agents from Open-Ended Human Feedback
+
+## Introduction
+
+AutoLibra is designed to facilitate the evaluation of agents through metrics derived from human feedback. This document outlines the steps for contributors to prepare data, annotate it, and run experiments.
 
 ## Contributor doc
 
@@ -7,17 +11,17 @@
 Install git lfs if you haven't already. This is required to download the large files in the dataset.
 
 #### From scratch
-For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/osw-eval`. This is for new dataset that you have created.
+For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/autolibra-eval`. Upload new datasets to this shared repo.
 
 ```bash
 # Download and preprocess <dataset>
-uv run python -m osw_eval_core.datasets.<dataset>
+uv run python -m autolibra_core.datasets.<dataset>
 ```
 
 #### Download from huggingface
 
 ```bash
-git clone https://huggingface.co/datasets/open-social-world/osw-eval .data
+git clone https://huggingface.co/datasets/open-social-world/autolibra-eval .data
 ```
 
 #### Upload your data to huggingface
@@ -46,5 +50,7 @@ streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotatio
 
 ### To run metric extraction
 ```bash
-uv run python -m osw_eval_core.gen_eval.generator
+uv run python -m autolibra_core.gen_eval.generator
 ```
+### Run experiments
+Test environments (BALROG, etc) are included as submodules under .gitmodules. Documentation for using these environments are included within each environment repo.

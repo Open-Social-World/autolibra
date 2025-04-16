@@ -1,14 +1,14 @@
 from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI
-from osw_eval_core.configs import OSWEvalSettings
+from autolibra_core.configs import AutoLibraEvalSettings
 from pydantic import BaseModel, ValidationError
 from ..data import Aspect
 from osw_data import Metric
 
 
 def _load_behavior_clustering_template() -> jinja2.Template:
-    with resources.files("osw_eval_core.templates").joinpath(
+    with resources.files("autolibra_core.templates").joinpath(
         "behavior_clustering.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())
@@ -26,7 +26,7 @@ async def behavior_clustering(
         behavior_feedback_list=aspects,
     )
 
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
 
     model = settings.azure_openai_o3_model
     assert model is not None

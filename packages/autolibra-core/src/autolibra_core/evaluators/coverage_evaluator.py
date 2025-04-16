@@ -5,14 +5,14 @@ import logfire
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
 from osw_data.metrics import Metric
-from osw_eval_core.configs import OSWEvalSettings
-from osw_eval_core.data import Aspect
-from osw_eval_core.data.primitives import Trait
+from autolibra_core.configs import AutoLibraEvalSettings
+from autolibra_core.data import Aspect
+from autolibra_core.data.primitives import Trait
 from ..data import MetricTrainingInstance
 from ..operators import feedback_grounding
 from pydantic import BaseModel, Field, ValidationError, create_model
 from pydantic.fields import FieldInfo
-from osw_eval_core.utils import load_prompt_template
+from autolibra_core.utils import load_prompt_template
 
 
 def _sanitize_string(s: str) -> str:
@@ -61,7 +61,7 @@ async def create_aspect_traits_match_pydantic_model(
 async def match_aspects_and_traits(
     client: AsyncAzureOpenAI, aspects: list[Aspect], traits: list[Metric]
 ) -> dict[str, str]:
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
     results: list[BaseModel] = []
     for aspect in aspects:
         aspect_traits_model = await create_aspect_traits_match_pydantic_model(
@@ -196,6 +196,13 @@ async def run_coverage_eval(
     instance_aspects = await asyncio.gather(
         *[feedback_grounding(instance, client) for instance in instances]
     )
+
+    with open("feedback_grounding_results.jsonl", "w") as f:
+        for feedback_grounding_result in instance_aspects:
+            for aspect in feedback_grounding_result:
+                f.write(aspect.model_dump_json(indent=2))
+                f.write("\n")
+            f.write("\n")
 
     coverage_results = await asyncio.gather(
         *[

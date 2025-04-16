@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
-class OSWEvalSettings(BaseSettings):
+class AutoLibraEvalSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     azure_api_key: str
     azure_endpoint: str

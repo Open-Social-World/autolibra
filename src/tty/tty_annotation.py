@@ -423,8 +423,16 @@ class TTYAnnotator:
                     console.print("\n[red]Quit Annotation...[/red]")
                     raise KeyboardInterrupt()
 
+        # Block for 5 seconds before asking for feedback
+
         # Get annotation
         console.print("\n[bold green]Trajectory complete![/bold green]")
+        console.print("\nPress y to exit blocking mode and provide feedback...")
+        blockmode_exit = False
+        while not blockmode_exit:
+            user_input = input()
+            if user_input.lower() == "y":
+                blockmode_exit = True
         console.print(
             f"\nPlease provide your feedback on {selected_agent}'s trajectory:"
         )

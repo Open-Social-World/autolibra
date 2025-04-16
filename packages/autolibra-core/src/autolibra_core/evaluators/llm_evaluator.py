@@ -3,7 +3,7 @@ from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
 from osw_data.metrics import Metric
-from osw_eval_core.configs import OSWEvalSettings
+from autolibra_core.configs import AutoLibraEvalSettings
 from ..data import MetricTrainingInstance
 from ..utils import render_training_instance
 from pydantic import BaseModel, ValidationError, create_model, Field
@@ -32,12 +32,11 @@ def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
             for metric in metrics
         },
     )
-
     return eval_result  # type: ignore[no-any-return]
 
 
 def _load_llm_eval_template() -> jinja2.Template:
-    with resources.files("osw_eval_core.templates").joinpath(
+    with resources.files("autolibra_core.templates").joinpath(
         "llm_as_a_judge_evaluator_v3.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())
@@ -49,7 +48,7 @@ semaphore = asyncio.Semaphore(20)  # Limit to 3 concurrent tasks
 async def eval_instance(
     instance: MetricTrainingInstance, metrics: list[Metric], client: AsyncAzureOpenAI
 ) -> BaseModel:
-    settings = OSWEvalSettings()
+    settings = AutoLibraEvalSettings()
     template = _load_llm_eval_template()
 
     prompt = template.render(

@@ -143,7 +143,7 @@ def streamlit_main(annotations_dir: Path) -> None:
         st.info(
             "Please provide the full path to the annotations directory. For example:\n\n"
             "```bash\n"
-            "osw-eval view-annotations .data/annotations/sotopia/annotations\n"
+            "autolibra-eval view-annotations .data/annotations/sotopia/annotations\n"
             "```"
         )
         return
