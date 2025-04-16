@@ -4,15 +4,15 @@ from typing import Literal
 import logfire
 from openai import AsyncAzureOpenAI, RateLimitError
 import openai
-from autolibra_data.metrics import Metric
-from autolibra_eval_core.configs import AutoLibraEvalSettings
-from autolibra_eval_core.data import Aspect
-from autolibra_eval_core.data.primitives import Trait
+from osw_data.metrics import Metric
+from autolibra_core.configs import AutoLibraEvalSettings
+from autolibra_core.data import Aspect
+from autolibra_core.data.primitives import Trait
 from ..data import MetricTrainingInstance
 from ..operators import feedback_grounding
 from pydantic import BaseModel, Field, ValidationError, create_model
 from pydantic.fields import FieldInfo
-from autolibra_eval_core.utils import load_prompt_template
+from autolibra_core.utils import load_prompt_template
 
 
 def _sanitize_string(s: str) -> str:

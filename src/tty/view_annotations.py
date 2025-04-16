@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 from datetime import datetime
 import typer
-from autolibra_data.annotation import AnnotationSystem
+from osw_data.annotation import AnnotationSystem
 from rich.console import Console
 from typing import List, Dict, Any
 

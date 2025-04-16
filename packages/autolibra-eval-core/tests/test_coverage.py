@@ -1,11 +1,11 @@
 import pickle
 from openai import AsyncAzureOpenAI
-from autolibra_data.metrics import Metric
-from autolibra_eval_core.configs import AutoLibraEvalSettings
-from autolibra_eval_core.evaluators.coverage_evaluator import (
+from osw_data.metrics import Metric
+from autolibra_core.configs import AutoLibraEvalSettings
+from autolibra_core.evaluators.coverage_evaluator import (
     match_aspects_and_traits,
 )
-from autolibra_eval_core.data import Aspect
+from autolibra_core.data import Aspect
 import pytest
 
 """
@@ -49,7 +49,7 @@ async def test_match_aspects_and_traits() -> None:
 
     (_aspects, _traits) = pickle.load(
         open(
-            "/Users/hao/autolibra-eval/packages/autolibra-eval-core/tests/positive_aspects_traits.pkl",
+            "/Users/hao/autolibra-eval/packages/autolibra-core/tests/positive_aspects_traits.pkl",
             "rb",
         )
     )

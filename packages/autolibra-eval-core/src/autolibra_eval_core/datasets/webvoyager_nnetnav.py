@@ -7,8 +7,8 @@ import numpy as np
 from PIL import Image
 
 # Import our dataset classes
-from autolibra_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
-from autolibra_data.annotation import AnnotationSystem
+from osw_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
+from osw_data.annotation import AnnotationSystem
 
 from .base import BaseConverter, run_converter
 

@@ -1,5 +1,5 @@
 [project]
-name = "autolibra-eval-core"
+name = "autolibra-core"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.32.3",
     "rich>=13.9.4",
     "types-requests>=2.32.0.20241016",
-    "autolibra-data>=0.0.1",
+    "osw-data>=0.0.1",
 ]
 
 [project.optional-dependencies]
@@ -27,10 +27,10 @@ sotopia = [
 ]
 
 [tool.hatch.build]
-include = ["src/autolibra_eval_core/templates/*.j2"]
+include = ["src/autolibra_core/templates/*.j2"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/autolibra_eval_core"]
+packages = ["src/autolibra_core"]
 
 [build-system]
 requires = ["hatchling"]

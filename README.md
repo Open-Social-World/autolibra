@@ -15,7 +15,7 @@ For contributors, it is the best to use our shared data repo on huggingface: `op
 
 ```bash
 # Download and preprocess <dataset>
-uv run python -m autolibra_eval_core.datasets.<dataset>
+uv run python -m autolibra_core.datasets.<dataset>
 ```
 
 #### Download from huggingface
@@ -50,7 +50,7 @@ streamlit run src/tty/view_annotations.py -- .data/annotations/sotopia/annotatio
 
 ### To run metric extraction
 ```bash
-uv run python -m autolibra_eval_core.gen_eval.generator
+uv run python -m autolibra_core.gen_eval.generator
 ```
 ### Run experiments
 Test environments (BALROG, etc) are included as submodules under .gitmodules. Documentation for using these environments are included within each environment repo.

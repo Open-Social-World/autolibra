@@ -1,7 +1,7 @@
 from typing import Literal
-from autolibra_data.trajectory import SymmetricTrajectory
+from osw_data.trajectory import SymmetricTrajectory
 from pydantic import BaseModel, Field
-from autolibra_data import Metric
+from osw_data import Metric
 
 
 class Aspect(BaseModel):

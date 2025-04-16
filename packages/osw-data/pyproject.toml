@@ -1,5 +1,5 @@
 [project]
-name = "autolibra-data"
+name = "osw-data"
 version = "0.0.1"
 description = "Add your description here"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/autolibra_data"]
+packages = ["src/osw_data"]
 
 
 [build-system]

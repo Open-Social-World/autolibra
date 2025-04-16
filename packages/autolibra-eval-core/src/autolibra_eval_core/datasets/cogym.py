@@ -2,7 +2,7 @@ import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from autolibra_data import (
+from osw_data import (
     MultiAgentDataset,
     AgentMetadata,
     MediaType,

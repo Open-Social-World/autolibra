@@ -12,13 +12,13 @@
 import asyncio
 from datetime import datetime
 from openai import AsyncAzureOpenAI
-from autolibra_data import Metric, MultiAgentDataset, MetricSet
-from autolibra_data.annotation import AnnotationSystem
-from autolibra_eval_core import run_llm_eval, behavior_clustering, feedback_grounding
-from autolibra_eval_core.data import MetricTrainingInstance, Trait
-from autolibra_eval_core.configs import AutoLibraEvalSettings
-from autolibra_eval_core.evaluators.coverage_evaluator import run_coverage_eval
-from autolibra_eval_core.evaluators.llm_evaluator import _make_snake_case
+from osw_data import Metric, MultiAgentDataset, MetricSet
+from osw_data.annotation import AnnotationSystem
+from autolibra_core import run_llm_eval, behavior_clustering, feedback_grounding
+from autolibra_core.data import MetricTrainingInstance, Trait
+from autolibra_core.configs import AutoLibraEvalSettings
+from autolibra_core.evaluators.coverage_evaluator import run_coverage_eval
+from autolibra_core.evaluators.llm_evaluator import _make_snake_case
 import logfire
 
 

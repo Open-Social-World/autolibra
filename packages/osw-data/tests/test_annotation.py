@@ -1,5 +1,5 @@
 from datetime import datetime
-from autolibra_data.annotation import AnnotationSpan, AnnotationSystem
+from osw_data.annotation import AnnotationSpan, AnnotationSystem
 from pathlib import Path
 
 

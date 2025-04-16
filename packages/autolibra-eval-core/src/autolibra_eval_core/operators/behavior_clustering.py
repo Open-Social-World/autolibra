@@ -1,14 +1,14 @@
 from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI
-from autolibra_eval_core.configs import AutoLibraEvalSettings
+from autolibra_core.configs import AutoLibraEvalSettings
 from pydantic import BaseModel, ValidationError
 from ..data import Aspect
-from autolibra_data import Metric
+from osw_data import Metric
 
 
 def _load_behavior_clustering_template() -> jinja2.Template:
-    with resources.files("autolibra_eval_core.templates").joinpath(
+    with resources.files("autolibra_core.templates").joinpath(
         "behavior_clustering.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())

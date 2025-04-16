@@ -8,8 +8,8 @@ from rich.markdown import Markdown
 from rich.table import Table
 import json
 
-from autolibra_data.dataset import MultiAgentDataset
-from autolibra_data.trajectory import PointType, MediaType
+from osw_data.dataset import MultiAgentDataset
+from osw_data.trajectory import PointType, MediaType
 
 console = Console()
 app = typer.Typer()

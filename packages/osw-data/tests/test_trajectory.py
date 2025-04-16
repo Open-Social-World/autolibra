@@ -1,5 +1,5 @@
 from pathlib import Path
-from autolibra_data.trajectory import (
+from osw_data.trajectory import (
     SymmetricTrajectory,
     MediaType,
     PointType,

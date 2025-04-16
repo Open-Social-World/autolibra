@@ -9,9 +9,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "autolibra-data",
+    "autolibra-core",
     "autolibra-eval",
-    "autolibra-eval-core",
+    "osw-data",
 ]
 
 [[package]]
@@ -109,32 +109,55 @@ wheels = [
 ]
 
 [[package]]
-name = "autolibra-data"
-version = "0.0.1"
-source = { editable = "packages/autolibra-data" }
+name = "autolibra-core"
+version = "0.1.0"
+source = { editable = "packages/autolibra-eval-core" }
 dependencies = [
+    { name = "jinja2" },
     { name = "numpy" },
+    { name = "osw-data" },
+    { name = "polars" },
     { name = "pydantic" },
+    { name = "pydantic-ai" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "rich" },
-    { name = "types-pyyaml" },
+    { name = "types-requests" },
+]
+
+[package.optional-dependencies]
+sotopia = [
+    { name = "huggingface-hub" },
+]
+webarena = [
+    { name = "gdown" },
+    { name = "pillow" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "gdown", marker = "extra == 'webarena'", specifier = ">=5.2.0" },
+    { name = "huggingface-hub", marker = "extra == 'sotopia'", specifier = ">=0.27.1" },
+    { name = "jinja2", specifier = ">=3.1.5" },
     { name = "numpy", specifier = ">=1.9.3" },
+    { name = "osw-data", editable = "packages/osw-data" },
+    { name = "pillow", marker = "extra == 'webarena'", specifier = ">=11.1.0" },
+    { name = "polars", specifier = ">=1.19.0" },
     { name = "pydantic", specifier = ">=2.7" },
+    { name = "pydantic-ai", specifier = ">=0.0.18" },
     { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", specifier = ">=13.9.4" },
-    { name = "types-pyyaml", specifier = ">=6.0.2" },
+    { name = "types-requests", specifier = ">=2.32.0.20241016" },
 ]
+provides-extras = ["webarena", "sotopia"]
 
 [[package]]
 name = "autolibra-eval"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "autolibra-eval-core", extra = ["sotopia", "webarena"] },
+    { name = "autolibra-core", extra = ["sotopia", "webarena"] },
     { name = "fastapi" },
     { name = "logfire" },
     { name = "matplotlib" },
@@ -164,7 +187,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "autolibra-eval-core", extras = ["webarena", "sotopia"], editable = "packages/autolibra-eval-core" },
+    { name = "autolibra-core", extras = ["webarena", "sotopia"], editable = "packages/autolibra-eval-core" },
     { name = "fastapi", specifier = ">=0.115.6" },
     { name = "logfire", specifier = ">=3.7.1" },
     { name = "marimo", marker = "extra == 'notebook'", specifier = ">=0.10" },
@@ -188,50 +211,6 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.25.2" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
 ]
-
-[[package]]
-name = "autolibra-eval-core"
-version = "0.1.0"
-source = { editable = "packages/autolibra-eval-core" }
-dependencies = [
-    { name = "autolibra-data" },
-    { name = "jinja2" },
-    { name = "numpy" },
-    { name = "polars" },
-    { name = "pydantic" },
-    { name = "pydantic-ai" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "rich" },
-    { name = "types-requests" },
-]
-
-[package.optional-dependencies]
-sotopia = [
-    { name = "huggingface-hub" },
-]
-webarena = [
-    { name = "gdown" },
-    { name = "pillow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "autolibra-data", editable = "packages/autolibra-data" },
-    { name = "gdown", marker = "extra == 'webarena'", specifier = ">=5.2.0" },
-    { name = "huggingface-hub", marker = "extra == 'sotopia'", specifier = ">=0.27.1" },
-    { name = "jinja2", specifier = ">=3.1.5" },
-    { name = "numpy", specifier = ">=1.9.3" },
-    { name = "pillow", marker = "extra == 'webarena'", specifier = ">=11.1.0" },
-    { name = "polars", specifier = ">=1.19.0" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "pydantic-ai", specifier = ">=0.0.18" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "rich", specifier = ">=13.9.4" },
-    { name = "types-requests", specifier = ">=2.32.0.20241016" },
-]
-provides-extras = ["webarena", "sotopia"]
 
 [[package]]
 name = "beautifulsoup4"
@@ -1668,6 +1647,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/b6/3c56e22e9b51bcb89edab30d54830958f049760bbd9ab0a759cece7bca88/opentelemetry_semantic_conventions-0.53b1.tar.gz", hash = "sha256:4c5a6fede9de61211b2e9fc1e02e8acacce882204cd770177342b6a3be682992", size = 114350 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/27/6b/a8fb94760ef8da5ec283e488eb43235eac3ae7514385a51b6accf881e671/opentelemetry_semantic_conventions-0.53b1-py3-none-any.whl", hash = "sha256:21df3ed13f035f8f3ea42d07cbebae37020367a53b47f1ebee3b10a381a00208", size = 188443 },
+]
+
+[[package]]
+name = "osw-data"
+version = "0.0.1"
+source = { editable = "packages/osw-data" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.9.3" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "rich", specifier = ">=13.9.4" },
+    { name = "types-pyyaml", specifier = ">=6.0.2" },
 ]
 
 [[package]]

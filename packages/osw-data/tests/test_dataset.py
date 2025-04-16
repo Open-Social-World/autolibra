@@ -1,4 +1,4 @@
-from autolibra_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
+from osw_data import MultiAgentDataset, AgentMetadata, MediaType, PointType
 from datetime import datetime
 import numpy as np
 from pathlib import Path

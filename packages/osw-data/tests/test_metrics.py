@@ -4,7 +4,7 @@ import json
 from typing import Generator
 
 # Import the classes to test
-from autolibra_data.metrics import MetricSet, Metric, MetricSetMetadata
+from osw_data.metrics import MetricSet, Metric, MetricSetMetadata
 
 
 @pytest.fixture

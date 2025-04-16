@@ -1,12 +1,12 @@
 from importlib import resources
 import jinja2
-from autolibra_data.dataset import DataInstance
-from autolibra_data.trajectory import SymmetricTrajectory
-from autolibra_eval_core.data.primitives import MetricTrainingInstance
+from osw_data.dataset import DataInstance
+from osw_data.trajectory import SymmetricTrajectory
+from autolibra_core.data.primitives import MetricTrainingInstance
 
 
 def load_prompt_template(jinja_file: str) -> jinja2.Template:
-    with resources.files("autolibra_eval_core.templates").joinpath(jinja_file).open(
+    with resources.files("autolibra_core.templates").joinpath(jinja_file).open(
         "r"
     ) as f:
         return jinja2.Template(f.read())

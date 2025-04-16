@@ -6,10 +6,10 @@ import csv
 import shutil
 
 # Import our dataset classes
-from autolibra_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
+from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
-from autolibra_data.utils import file_pairs_list
+from osw_data.utils import file_pairs_list
 
 
 class BalrogConverter(BaseConverter):

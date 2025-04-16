@@ -2,8 +2,8 @@ import asyncio
 from importlib import resources
 import jinja2
 from openai import AsyncAzureOpenAI, RateLimitError
-from autolibra_data.metrics import Metric
-from autolibra_eval_core.configs import AutoLibraEvalSettings
+from osw_data.metrics import Metric
+from autolibra_core.configs import AutoLibraEvalSettings
 from ..data import MetricTrainingInstance
 from ..utils import render_training_instance
 from pydantic import BaseModel, ValidationError, create_model, Field
@@ -36,7 +36,7 @@ def _make_evaluation_result_class(metrics: list[Metric]) -> type[BaseModel]:
 
 
 def _load_llm_eval_template() -> jinja2.Template:
-    with resources.files("autolibra_eval_core.templates").joinpath(
+    with resources.files("autolibra_core.templates").joinpath(
         "llm_as_a_judge_evaluator_v3.j2"
     ).open("r") as f:
         return jinja2.Template(f.read())

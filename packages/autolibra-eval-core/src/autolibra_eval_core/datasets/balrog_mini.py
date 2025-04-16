@@ -7,7 +7,7 @@ import shutil
 
 
 # Import our dataset classes
-from autolibra_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
+from osw_data import MultiAgentDataset, AgentMetadata, PointType, MediaType
 
 from .base import BaseConverter, run_converter
 
