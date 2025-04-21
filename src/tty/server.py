@@ -6,24 +6,42 @@ import sys
 from contextlib import asynccontextmanager
 import re
 import logging
+# Add pydantic for request body validation
+from pydantic import BaseModel
+# Add datetime for timestamps
+from datetime import datetime
 
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
 from osw_data.metrics import MetricSet
+# Import AnnotationSystem
+from osw_data.annotation import AnnotationSystem, AnnotationSpan
 
 # TEMPORARY Add the package directory to the Python path
 sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
 # TEMPORARY Initialize dataset path
 dataset_path = Path(__file__).parent.parent.parent / ".data" / "sotopia"
+# Define annotation path
+annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations" / "sotopia"
 
 # Add at the top of the file
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Define a Pydantic model for the annotation payload
+class AnnotationPayload(BaseModel):
+    instance_id: str
+    agent_id: str
+    annotator_id: str
+    comment_text: str
+    selection_text: str
+    start_offset: int
+    end_offset: int
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize dataset and load labels
-    global dataset, instance_labels, metric_set
+    # Startup: Initialize dataset, load labels, and initialize annotation system
+    global dataset, instance_labels, metric_set, annotation_system # Add annotation_system
     
     # Initialize dataset
     dataset = MultiAgentDataset(name="sotopia", base_path=dataset_path)
@@ -34,15 +52,44 @@ async def lifespan(app: FastAPI):
         with open(labels_path, "r") as f:
             instance_labels = json.load(f)
     else:
-        print(f"Warning: Labels file not found at {labels_path}")
+        logger.warning(f"Labels file not found at {labels_path}")
+        instance_labels = {} # Initialize as empty dict if not found
     
     # Try to load metrics
     try:
         metric_set = MetricSet(name="sotopia", base_path=dataset_path, induced_from="sotopia")
     except Exception as e:
-        print(f"Warning: Could not load metrics: {str(e)}")
+        logger.warning(f"Could not load metrics: {str(e)}")
         metric_set = None
-    
+
+    # Initialize Annotation System
+    try:
+        # Ensure the annotation directory exists
+        annotation_path.mkdir(parents=True, exist_ok=True)
+        
+        annotation_system = AnnotationSystem(
+            base_path=annotation_path,
+            project_name="Sotopia Web Annotation", # Give it a relevant name
+            description="Annotations added via the web interface.",
+            annotation_schema={
+                "comment": {
+                    "type": "object",
+                    "properties": {
+                        "comment_text": {"type": "string"},
+                        "selection_text": {"type": "string"},
+                        "start_offset": {"type": "integer"},
+                        "end_offset": {"type": "integer"},
+                    },
+                    "required": ["comment_text", "selection_text", "start_offset", "end_offset"],
+                    "description": "A comment linked to a text selection.",
+                }
+            },
+        )
+        logger.info(f"Annotation system initialized at {annotation_path}")
+    except Exception as e:
+        logger.error(f"Failed to initialize AnnotationSystem: {str(e)}", exc_info=True)
+        annotation_system = None # Set to None if initialization fails
+
     yield
     
     # Shutdown: Clean up resources if needed
@@ -51,9 +98,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Conversation Dataset API", lifespan=lifespan)
 
 # Configure CORS to allow requests from frontend
+# Make sure your frontend URL is allowed, or use "*" for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # REPLACE with FRONTEND URL
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Adjust as needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -277,7 +325,63 @@ def get_trajectory(instance_id: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Instance not found: {str(e)}")
 
+# --- NEW ANNOTATION ENDPOINT ---
+@app.post("/annotations")
+async def create_annotation(payload: AnnotationPayload):
+    """Receive and save a new annotation."""
+    logger.info(f"Received annotation payload: {payload.dict()}")
+
+    if not annotation_system:
+        logger.error("Annotation system not initialized.")
+        raise HTTPException(status_code=500, detail="Annotation system not available")
+
+    # Ensure annotator exists in the system
+    if payload.annotator_id not in annotation_system.project.annotators:
+        try:
+            annotation_system.add_annotator(
+                annotator_id=payload.annotator_id,
+                name=payload.annotator_id, # Use ID as name for simplicity
+            )
+            logger.info(f"Added new annotator: {payload.annotator_id}")
+        except Exception as e:
+            logger.error(f"Failed to add annotator {payload.annotator_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to add annotator: {str(e)}")
+
+    try:
+        # Prepare the content based on the schema
+        annotation_content = {
+            "comment": {
+                "comment_text": payload.comment_text,
+                "selection_text": payload.selection_text,
+                "start_offset": payload.start_offset,
+                "end_offset": payload.end_offset,
+            }
+        }
+
+        # Add the annotation
+        # We don't have a precise time span from the frontend comment system,
+        # so we'll use the current time as a point annotation (start=end).
+        # Alternatively, omit the span if your workflow allows.
+        current_time = datetime.now()
+        annotation_system.add_annotation(
+            instance_id=payload.instance_id,
+            agent_id=payload.agent_id,
+            annotator_id=payload.annotator_id,
+            content=annotation_content,
+            span=AnnotationSpan(start_time=current_time, end_time=current_time), # Point-in-time span
+            # span=None # Or omit span if not strictly needed here
+        )
+
+        logger.info(f"Annotation saved successfully for instance {payload.instance_id}, agent {payload.agent_id}")
+        return {"message": "Annotation saved successfully"}
+
+    except Exception as e:
+        logger.error(f"Failed to save annotation: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to save annotation: {str(e)}")
+# --- END NEW ANNOTATION ENDPOINT ---
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Add reload=True for development convenience
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
 

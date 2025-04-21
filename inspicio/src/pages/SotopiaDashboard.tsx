@@ -82,11 +82,12 @@ function SotopiaDashboard() {
     setConversationLoading(true);
     setSelectedInstance(instanceId);
     setScenario("");
+    setConversation([]); // Clear previous conversation
 
     try {
       const response = await fetch(`http://localhost:8000/trajectories/${instanceId}`);
       const data: ConversationData = await response.json();
-      setConversation(data.conversation);
+      setConversation(data.conversation || []); // Ensure conversation is set
 
       if (data.scenario) {
         setScenario(data.scenario);
@@ -138,7 +139,7 @@ function SotopiaDashboard() {
     return label;
   };
 
-  // Get unique agent IDs for rendering sidebars
+  // Get unique agent IDs for rendering sidebars AND comment systems
   const agentIds = selectedInstance && conversation.length > 0
     ? [...new Set(conversation.map(entry => entry.agent_id))]
     : [];
@@ -280,7 +281,7 @@ function SotopiaDashboard() {
         </Card>
         </div>
         
-        {/* Middle Panel - Conversation with CommentSystem */}
+        {/* Middle Panel - Conversation with potentially MULTIPLE CommentSystems */}
         <div className="md:col-span-6">
           <Card className="flex flex-col h-full">
             <CardHeader className="flex-shrink-0">
@@ -309,11 +310,30 @@ function SotopiaDashboard() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="flex-grow p-0 overflow-hidden">
-              <CommentSystem
-                initialText={formatConversationToString(conversation)}
-                isLoading={conversationLoading}
-              />
+            <CardContent className="flex-grow p-0 overflow-y-auto">
+              {conversationLoading ? (
+                 <div className="p-4 text-center text-muted-foreground">Loading Conversation...</div>
+              ) : selectedInstance && agentIds.length > 0 ? (
+                 // Map over agentIds to render a CommentSystem for each agent
+                 agentIds.map((agentId, index) => (
+                   <div key={agentId} className={index > 0 ? "mt-4 border-t pt-4" : ""}>
+                     {/* Optional: Add a header indicating which agent this CommentSystem is for */}
+                     <h3 className="text-md font-semibold mb-2 px-4">Annotate as: {agentId}</h3>
+                     <CommentSystem
+                       // Pass the formatted conversation string
+                       initialText={formatConversationToString(conversation)}
+                       isLoading={false} // Loading is handled outside now
+                       instanceId={selectedInstance}
+                       // Pass the specific agentId for this instance
+                       agentId={agentId}
+                     />
+                   </div>
+                 ))
+              ) : (
+                 <div className="p-4 text-center text-muted-foreground h-full flex items-center justify-center">
+                   {selectedInstance ? "No conversation data found." : "Select a trajectory to view conversation and annotations."}
+                 </div>
+              )}
             </CardContent>
           </Card>
         </div>

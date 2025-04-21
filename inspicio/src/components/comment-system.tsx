@@ -1,89 +1,193 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, MessageSquare, X, Send, Trash2, Edit } from 'lucide-react';
+import { User, MessageSquare, X, Send, Trash2, Edit, Loader2, LogIn } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 // Define props interface
 interface CommentSystemProps {
   initialText: string;
-  isLoading?: boolean; // Optional prop to show loading state
+  isLoading?: boolean;
+  instanceId: string | null;
+  agentId: string;
+}
+
+// Define comment structure (Combine elements from both versions)
+interface Comment {
+    id: string;
+    text: string;
+    selection: {
+        text: string;
+        startOffset: number;
+        endOffset: number;
+    };
+    user: string; // Annotator ID
+    timestamp: Date;
+    replies: Reply[];
+    isSaving?: boolean; // Keep for backend status
+    saveError?: string | null; // Keep for backend status
+}
+
+interface Reply { // Keep Reply interface
+    id: string;
+    text: string;
+    user: string;
+    timestamp: Date;
 }
 
 // Main component
-const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = false }) => {
+const CommentSystem: React.FC<CommentSystemProps> = ({
+    initialText,
+    isLoading = false,
+    instanceId,
+    agentId
+}) => {
   const [text, setText] = useState(initialText);
-  const [selection, setSelection] = useState<any>(null); // Use 'any' or define a specific type
-  const [comments, setComments] = useState<any[]>([]); // Use 'any' or define a specific type
-  const [activeComment, setActiveComment] = useState<string | null>(null);
-  const [newComment, setNewComment] = useState('');
-  const [editingComment, setEditingComment] = useState<string | null>(null);
-  const textRef = useRef<HTMLDivElement>(null);
-  const commentInputRef = useRef<HTMLInputElement>(null);
+  const [selection, setSelection] = useState<any>(null); // Keep state
+  const [comments, setComments] = useState<Comment[]>([]); // Keep state
+  const [activeComment, setActiveComment] = useState<string | null>(null); // Keep state
+  const [newComment, setNewComment] = useState(''); // Keep state
+  const [editingComment, setEditingComment] = useState<string | null>(null); // Keep state
+  const textRef = useRef<HTMLDivElement>(null); // Keep ref
+  const commentInputRef = useRef<HTMLInputElement>(null); // Keep ref
+  const [isSubmitting, setIsSubmitting] = useState(false); // Keep state
+  const [submitError, setSubmitError] = useState<string | null>(null); // Keep state
+  const [annotatorId, setAnnotatorId] = useState<string>(''); // Keep state
+  const [isAnnotatorIdSet, setIsAnnotatorIdSet] = useState<boolean>(false); // Keep state
 
-  // Update text and reset comments when initialText prop changes
+  // Reset comments when initialText changes (Keep this effect)
   useEffect(() => {
     setText(initialText);
-    setComments([]); // Reset comments when text changes
+    setComments([]);
     setSelection(null);
     setActiveComment(null);
     setNewComment('');
     setEditingComment(null);
+    setSubmitError(null);
   }, [initialText]);
 
-  // Handle text selection
-  const handleTextSelection = () => {
-    const selectionObj = window.getSelection();
+  // Handle setting the annotator ID (Keep this handler)
+  const handleAnnotatorIdSubmit = () => {
+      if (annotatorId.trim()) {
+          setIsAnnotatorIdSet(true);
+      }
+  }
 
-    if (selectionObj && selectionObj.toString().length > 0 && textRef.current?.contains(selectionObj.anchorNode)) {
+  // Handle text selection - Revert to older positioning logic, keep annotator check
+  const handleTextSelection = () => {
+    if (!isAnnotatorIdSet) { // Keep this check
+        setSelection(null);
+        return;
+    }
+
+    const selectionObj = window.getSelection();
+    // Use older logic for checking selection and calculating position/offsets
+    if (selectionObj && selectionObj.toString().length > 0 && textRef.current && textRef.current.contains(selectionObj.anchorNode)) {
       const range = selectionObj.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      const textRect = textRef.current.getBoundingClientRect();
+      const textRect = textRef.current.getBoundingClientRect(); // Need container rect
 
-      // Calculate offsets relative to the textRef container
       const preSelectionRange = document.createRange();
       preSelectionRange.selectNodeContents(textRef.current);
       preSelectionRange.setEnd(range.startContainer, range.startOffset);
       const startOffset = preSelectionRange.toString().length;
       const endOffset = startOffset + range.toString().length;
 
-
       setSelection({
         text: selectionObj.toString(),
-        startOffset: startOffset, // Use calculated offset
-        endOffset: endOffset,     // Use calculated offset
+        startOffset: startOffset,
+        endOffset: endOffset,
+        // Use older relative positioning logic
         position: {
-          left: rect.right - textRect.left,
-          top: rect.top - textRect.top
+          left: rect.right - textRect.left, // Position relative to textRef
+          top: rect.top - textRect.top     // Position relative to textRef
         }
       });
+      setSubmitError(null); // Clear previous errors
     } else {
       setSelection(null);
     }
   };
 
-  // Add a new comment
-  const addComment = () => {
-    if (selection && newComment.trim()) {
-      const comment = {
-        id: Date.now().toString(),
-        text: newComment,
-        selection: {
-          text: selection.text,
-          startOffset: selection.startOffset,
-          endOffset: selection.endOffset
-        },
-        user: "Current User", // Replace with actual user info if available
-        timestamp: new Date(),
-        replies: []
-      };
+  // Add a new comment - Revert optimistic update logic, keep async fetch
+  const addComment = async () => {
+    // Keep validation
+    if (!instanceId || !isAnnotatorIdSet || !annotatorId.trim() || !selection || !newComment.trim()) {
+        console.error("Validation failed in addComment");
+        setSubmitError("Cannot add comment: Missing required information or Annotator ID not set.");
+        return;
+    }
 
-      setComments([...comments, comment]);
-      setNewComment('');
-      setSelection(null);
-      setActiveComment(comment.id);
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    // Data for backend (Keep this)
+    const commentData = {
+      instance_id: instanceId,
+      agent_id: agentId,
+      annotator_id: annotatorId.trim(),
+      comment_text: newComment,
+      selection_text: selection.text,
+      start_offset: selection.startOffset,
+      end_offset: selection.endOffset,
+    };
+
+    // Create the comment object similar to the older version
+    const tempId = `temp-${Date.now()}`; // Use temp ID for optimistic update
+    const comment: Comment = {
+      id: tempId,
+      text: newComment,
+      selection: { // Ensure structure matches Comment interface
+        text: selection.text,
+        startOffset: selection.startOffset,
+        endOffset: selection.endOffset
+      },
+      user: annotatorId.trim(), // Use the set annotator ID
+      timestamp: new Date(),
+      replies: [],
+      isSaving: true, // Mark as saving for optimistic UI
+      saveError: null
+    };
+
+    // Optimistic update - Directly add the new comment object (like older version)
+    setComments(prevComments => [...prevComments, comment]);
+
+    // Reset form state
+    setNewComment('');
+    setSelection(null); // Close popover
+    // Optionally activate the new comment
+    // setActiveComment(comment.id);
+
+    // --- Keep Backend Fetch Logic ---
+    try {
+      const response = await fetch('http://localhost:8000/annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(commentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to parse error response.' }));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      // Update comment state on success (remove saving flag)
+      setComments(prev => prev.map(c => c.id === tempId ? { ...c, isSaving: false } : c));
+
+    } catch (error) {
+      console.error('Failed to save comment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setSubmitError(`Failed to save: ${errorMessage}`);
+      // Update comment state on error (add error flag/message)
+      setComments(prev => prev.map(c => c.id === tempId ? { ...c, isSaving: false, saveError: errorMessage } : c));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Edit a comment
+  // Edit a comment (Keep current logic, seems standard)
   const updateComment = (id: string, newText: string) => {
+    // Add backend update logic here if needed
     setComments(
       comments.map(comment =>
         comment.id === id
@@ -94,16 +198,18 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
     setEditingComment(null);
   };
 
-  // Delete a comment
+  // Delete a comment (Keep current logic, seems standard)
   const deleteComment = (id: string) => {
+    // Add backend delete logic here if needed
     setComments(comments.filter(comment => comment.id !== id));
     if (activeComment === id) {
-        setActiveComment(null); // Deselect if the active comment is deleted
+        setActiveComment(null);
     }
   };
 
-  // Add a reply to a comment
+  // Add a reply (Keep current logic, seems standard)
   const addReply = (commentId: string, replyText: string) => {
+    // Add backend reply logic here if needed
     if (replyText.trim()) {
       setComments(
         comments.map(comment =>
@@ -113,9 +219,9 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
                 replies: [
                   ...comment.replies,
                   {
-                    id: Date.now().toString(),
+                    id: `reply-${Date.now()}`, // Use temp ID
                     text: replyText,
-                    user: "Current User", // Replace with actual user info
+                    user: annotatorId.trim(), // Use annotator ID
                     timestamp: new Date()
                   }
                 ]
@@ -126,142 +232,96 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
     }
   };
 
-  // Handle clicking on highlighted text
+  // Handle clicking on highlighted text (Keep current logic)
   const handleHighlightClick = (commentId: string) => {
     setActiveComment(activeComment === commentId ? null : commentId);
+    // Optional: Scroll comment into view in the sidebar
+    const commentElement = document.getElementById(`comment-card-${commentId}`);
+    commentElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
-  // Focus on comment input when selection changes
+  // Focus on comment input when selection changes (Keep current logic)
   useEffect(() => {
     if (selection && commentInputRef.current) {
       commentInputRef.current.focus();
     }
   }, [selection]);
 
-  // Replace text with highlighted spans
-  const renderHighlightedText = () => {
-    if (!textRef.current) return <div ref={textRef} onMouseUp={handleTextSelection} className="relative p-4 border rounded text-gray-800 leading-relaxed whitespace-pre-wrap">{text}</div>;
+  // Format date utility (Keep this)
+  const formatDate = (date: Date): string => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
-    // Sort comments by start offset (descending) to avoid position shifts
+  // Render highlighted text - Revert to older logic
+  const renderHighlightedText = () => {
+    if (isLoading) { // Keep loading state
+        return <div className="p-4 text-muted-foreground">Loading text...</div>;
+    }
+    if (!text) { // Keep check for empty text
+        return <div className="p-4 text-muted-foreground">No text content available.</div>;
+    }
+
+    // Use older sorting and mapping logic
     const sortedComments = [...comments].sort((a, b) =>
-      b.selection.startOffset - a.selection.startOffset
+      a.selection.startOffset - b.selection.startOffset // Sort ascending for sequential processing
     );
 
-    let currentText = text;
     const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
 
     sortedComments.forEach(comment => {
         const { startOffset, endOffset } = comment.selection;
-        if (startOffset >= lastIndex && endOffset <= text.length) { // Basic validation
-            // Add text before the highlight
-            if (startOffset > lastIndex) {
-                parts.push(currentText.substring(lastIndex, startOffset));
-            }
-            // Add the highlighted span
-            parts.push(
-                <span
-                    key={comment.id}
-                    className={`${activeComment === comment.id ? 'bg-yellow-300' : 'bg-yellow-100'} cursor-pointer`}
-                    onClick={(e) => {
-                        e.stopPropagation(); // Prevent text selection handler
-                        handleHighlightClick(comment.id);
-                    }}
-                >
-                    {currentText.substring(startOffset, endOffset)}
-                </span>
-            );
-            lastIndex = endOffset;
+        // Add text before the highlight
+        if (startOffset > lastIndex) {
+            parts.push(text.substring(lastIndex, startOffset));
         }
+        // Add the highlighted span (use older class names or adapt)
+        parts.push(
+            <span
+                key={comment.id}
+                // Use classes similar to older version or current ones if preferred
+                className={`highlighted-text cursor-pointer rounded px-0.5 transition-all ${
+                    activeComment === comment.id ? 'bg-blue-200 ring-1 ring-blue-400' : 'bg-blue-100 hover:bg-blue-200' // Example classes
+                } ${comment.isSaving ? 'opacity-60 animate-pulse' : ''} ${comment.saveError ? 'bg-red-200 ring-1 ring-red-400' : ''}`} // Add saving/error styles
+                onClick={(e) => {
+                    e.stopPropagation(); // Prevent text selection handler
+                    handleHighlightClick(comment.id);
+                }}
+                title={comment.saveError ? `Error: ${comment.saveError}` : undefined} // Show error on hover
+            >
+                {text.substring(startOffset, endOffset)}
+            </span>
+        );
+        lastIndex = endOffset;
     });
 
     // Add any remaining text after the last highlight
-    if (lastIndex < currentText.length) {
-        parts.push(currentText.substring(lastIndex));
+    if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
     }
 
-
-    return <div
-      ref={textRef}
-      onMouseUp={handleTextSelection}
-      className="relative p-4 border rounded text-gray-800 leading-relaxed whitespace-pre-wrap"
-    >
-        {parts.map((part, index) => <React.Fragment key={index}>{part}</React.Fragment>)}
-    </div>;
+    // Return the div containing the parts
+    return <div className="whitespace-pre-wrap p-4">{parts.map((part, index) => <React.Fragment key={index}>{part}</React.Fragment>)}</div>;
   };
-
-  // Format date to a readable string
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
-  };
-
-  // Handle clicks outside of comments/highlights to deselect
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (textRef.current && !textRef.current.contains(event.target as Node)) {
-         // Check if click is outside the comment sidebar too if needed
-         // For simplicity, deselecting on any click outside the text area for now
-         // setSelection(null); // Keep selection popover open if clicked outside? Maybe not.
-      }
-      // More robust check needed if comment sidebar is complex
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [textRef]);
-
-
-  if (isLoading) {
-     return (
-        <div className="flex flex-col w-full max-w-4xl mx-auto border rounded-lg shadow-lg overflow-hidden bg-white min-h-[400px]">
-            <div className="flex border-b p-4 bg-gray-50">
-                <h1 className="text-lg font-semibold text-gray-700">Loading Conversation...</h1>
-            </div>
-            <div className="flex flex-1 items-center justify-center">
-                <p className="text-muted-foreground">Loading...</p>
-            </div>
-        </div>
-     )
-  }
-
-  if (!initialText && !isLoading) {
-     return (
-        <div className="flex flex-col w-full max-w-4xl mx-auto border rounded-lg shadow-lg overflow-hidden bg-white min-h-[400px]">
-            <div className="flex border-b p-4 bg-gray-50">
-                <h1 className="text-lg font-semibold text-gray-700">Conversation</h1>
-            </div>
-            <div className="flex flex-1 items-center justify-center">
-                <p className="text-muted-foreground">Select a trajectory to view the conversation.</p>
-            </div>
-        </div>
-     )
-  }
 
 
   return (
-    // Removed outer container div, assuming parent provides structure
-    <div className="flex flex-1 min-h-[400px] border rounded-lg shadow-lg overflow-hidden bg-white">
-        {/* Text Area */}
-        <div className="flex-1 p-4 overflow-auto relative">
+    // Use current outer structure
+    <div className="flex h-full">
+        {/* Text display area - Use current structure */}
+        <div className="flex-1 overflow-y-auto relative" ref={textRef} onMouseUp={handleTextSelection}>
           {renderHighlightedText()}
 
-          {/* Selection comment popover */}
-          {selection && (
+          {/* Selection Popover - Revert to older structure/style */}
+          {selection && isAnnotatorIdSet && ( // Keep annotator check
             <div
-              className="absolute flex items-center bg-white border rounded-lg shadow-lg p-2 z-10"
+              className="absolute flex items-center bg-white border rounded-lg shadow-lg p-2 z-10" // Style similar to older version
               style={{
-                top: `${selection.position.top + 10}px`, // Offset slightly below selection
-                left: `${selection.position.left}px`
+                top: `${selection.position.top + textRef.current?.scrollTop + 10}px`, // Adjust top based on scroll + offset
+                left: `${selection.position.left + textRef.current?.scrollLeft}px` // Adjust left based on scroll
               }}
-              // Prevent clicks inside popover from triggering outside click handler
-              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()} // Prevent closing on click inside
+              onMouseDown={(e) => e.stopPropagation()} // Prevent text selection trigger
             >
               <div className="flex items-center space-x-2">
                 <input
@@ -270,164 +330,137 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..."
-                  className="border rounded px-2 py-1 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      addComment();
-                    }
-                  }}
+                  className="border rounded px-2 py-1 text-sm" // Style similar to older version
+                  autoFocus // Keep autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') { addComment(); } }}
                 />
-                <button
+                <Button // Use Button component
                   onClick={addComment}
-                  className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  disabled={!newComment.trim()} // Disable if no text
+                  size="sm" // Use size prop
+                  disabled={isSubmitting || !newComment.trim()} // Keep disabled logic
                 >
-                  <Send size={16} />
-                </button>
-                <button
-                  onClick={() => setSelection(null)}
-                  className="p-1 text-gray-600 hover:text-gray-800"
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send size={16} />}
+                </Button>
+                <Button // Use Button component for close
+                    onClick={() => setSelection(null)}
+                    variant="ghost" // Use ghost variant
+                    size="sm"
+                    className="p-1"
                 >
                   <X size={16} />
-                </button>
+                </Button>
               </div>
+               {/* Display submit error inside popover */}
+               {submitError && <p className="text-xs text-red-600 mt-1 w-full text-center">{submitError}</p>}
             </div>
           )}
         </div>
 
-        {/* Comments sidebar */}
-        <div className="w-80 border-l bg-gray-50 overflow-y-auto">
-          <div className="p-4 border-b">
-            <div className="flex items-center">
-              <MessageSquare className="mr-2 text-gray-600" size={18} />
-              <h2 className="text-md font-medium text-gray-700">Comments ({comments.length})</h2>
-            </div>
+        {/* Comments sidebar - Use current structure but older rendering logic inside */}
+        <div className="w-80 border-l bg-gray-50 overflow-y-auto flex flex-col">
+          {/* Sidebar Header - Keep current header with Annotator ID */}
+          <div className="p-3 border-b sticky top-0 bg-gray-50 z-10">
+             <h3 className="text-sm font-semibold mb-2 text-center">
+                Comments (Agent: {agentId})
+             </h3>
+             {/* Annotator ID Input Area */}
+             <div className="flex items-end space-x-2">
+                 <div className="flex-grow">
+                     <Label htmlFor={`annotator-id-${agentId}`} className="text-xs font-medium text-gray-600">Annotator ID:</Label>
+                     <Input
+                         id={`annotator-id-${agentId}`}
+                         type="text"
+                         placeholder="Your ID"
+                         value={annotatorId}
+                         onChange={(e) => setAnnotatorId(e.target.value)}
+                         className="h-8 text-sm mt-1"
+                         disabled={isAnnotatorIdSet}
+                         onKeyDown={(e) => { if (e.key === 'Enter') handleAnnotatorIdSubmit(); }}
+                     />
+                 </div>
+                 <Button
+                     onClick={handleAnnotatorIdSubmit}
+                     size="sm"
+                     variant="outline"
+                     className="h-8"
+                     disabled={isAnnotatorIdSet || !annotatorId.trim()}
+                     title={isAnnotatorIdSet ? "Annotator ID is set" : "Set Annotator ID"}
+                 >
+                     <LogIn size={14} />
+                 </Button>
+             </div>
+             {/* Helper text for Annotator ID */}
+             {!isAnnotatorIdSet && annotatorId.trim() && ( <p className="text-xs text-muted-foreground mt-1">Press Enter or click button to set ID.</p> )}
+             {!isAnnotatorIdSet && !annotatorId.trim() && ( <p className="text-xs text-muted-foreground mt-1">Enter your Annotator ID to enable commenting.</p> )}
           </div>
 
-          <div className="p-4 space-y-4">
+          {/* Comments List Area - Use older rendering logic */}
+          <div className="p-4 space-y-4 flex-grow"> {/* Remove overflow-y-auto if parent handles scroll */}
             {comments.length === 0 ? (
+              // Use older "No comments yet" structure
               <div className="text-center text-gray-500 py-8">
                 <MessageSquare className="mx-auto mb-2" size={24} />
                 <p>No comments yet</p>
-                <p className="text-sm">Highlight text to add a comment</p>
+                {isAnnotatorIdSet ? (
+                    <p className="text-sm">Highlight text to add a comment</p>
+                ) : (
+                    <p className="text-sm text-orange-600">Set Annotator ID above to comment</p> // Keep prompt to set ID
+                )}
               </div>
             ) : (
+              // Use older map structure for comments
               comments.map(comment => (
                 <div
+                  id={`comment-card-${comment.id}`} // Keep ID for scrolling
                   key={comment.id}
-                  className={`border rounded-lg p-3 cursor-pointer transition-all ${activeComment === comment.id ? 'bg-white shadow-md ring-2 ring-blue-300' : 'bg-gray-100 hover:bg-gray-200'}`}
-                  onClick={() => handleHighlightClick(comment.id)} // Use handleHighlightClick for consistency
+                  // Use older class structure or adapt current ones
+                  className={`border rounded-lg p-3 cursor-pointer transition-all relative ${activeComment === comment.id ? 'bg-white shadow-md ring-2 ring-blue-300' : 'bg-gray-100 hover:bg-gray-200'} ${comment.saveError ? 'ring-2 ring-red-400 bg-red-50' : ''}`} // Keep error styling
+                  onClick={() => handleHighlightClick(comment.id)}
                 >
+                   {/* Saving/Error Indicators (Keep these) */}
+                   {comment.isSaving && ( <div className="absolute top-1 right-1 p-1 rounded-full bg-blue-100"> <Loader2 size={12} className="animate-spin text-blue-600" /> </div> )}
+                   {comment.saveError && ( <div className="absolute top-1 right-1 p-1 rounded-full bg-red-100" title={comment.saveError}> <X size={12} className="text-red-600" /> </div> )}
+
+                  {/* Comment Header (User, Timestamp, Actions) - Use older structure */}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2">
-                        <User size={16} />
-                      </div>
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2"> <User size={16} /> </div>
                       <div>
-                        <div className="font-medium text-sm">{comment.user}</div>
+                        <div className="font-medium text-sm">{comment.user}</div> {/* Shows annotatorId */}
                         <div className="text-xs text-gray-500">{formatDate(comment.timestamp)}</div>
                       </div>
                     </div>
-
-                    {/* Edit/Delete only show on hover or when active? For simplicity, always show for now */}
+                    {/* Actions - Use older structure */}
                     <div className="flex space-x-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingComment(comment.id); }}
-                        className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-300"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteComment(comment.id); }}
-                        className="text-gray-500 hover:text-red-500 p-1 rounded hover:bg-gray-300"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingComment(comment.id); }} className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-300 disabled:opacity-50" disabled={!!comment.isSaving || !!comment.saveError}> <Edit size={14} /> </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteComment(comment.id); }} className="text-gray-500 hover:text-red-500 p-1 rounded hover:bg-gray-300 disabled:opacity-50" disabled={!!comment.isSaving}> <Trash2 size={14} /> </button>
                     </div>
                   </div>
 
-                  {/* Highlighted text snippet */}
-                   <blockquote className="text-xs text-gray-600 border-l-2 pl-2 italic my-1 truncate">
-                     "{comment.selection.text}"
-                   </blockquote>
+                  {/* Highlighted text snippet - Use older structure */}
+                   <blockquote className="text-xs text-gray-600 border-l-2 pl-2 italic my-1 truncate"> "{comment.selection.text}" </blockquote>
 
+                  {/* Comment Body (View/Edit) - Use older structure */}
                   <div className="mb-2">
                     {editingComment === comment.id ? (
                       <div className="mt-1">
-                        <textarea
-                          defaultValue={comment.text}
-                          className="w-full p-2 border rounded text-sm"
-                          rows={3}
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()} // Prevent card click when editing
-                          onBlur={(e) => updateComment(comment.id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              updateComment(comment.id, e.target.value);
-                            } else if (e.key === 'Escape') {
-                                setEditingComment(null); // Cancel edit on Escape
-                            }
-                          }}
-                        />
+                        <textarea defaultValue={comment.text} className="w-full p-2 border rounded text-sm" rows={3} autoFocus onClick={(e) => e.stopPropagation()} onBlur={(e) => updateComment(comment.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); updateComment(comment.id, e.target.value); } else if (e.key === 'Escape') { setEditingComment(null); } }} />
                       </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{comment.text}</p>
-                    )}
+                    ) : ( <p className="text-sm whitespace-pre-wrap">{comment.text}</p> )}
                   </div>
 
-                  {/* Replies */}
+                  {/* Replies Section - Use older structure */}
                   <div className="mt-2 pl-3 border-l-2 border-gray-200 space-y-2">
-                    {comment.replies.map((reply: any) => ( // Add type for reply if defined
-                      <div key={reply.id} className="text-xs py-1">
-                        <div className="flex items-center mb-1">
-                           <div className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white mr-1.5">
-                             <User size={10} />
-                           </div>
-                          <div className="font-medium mr-1">{reply.user}</div>
-                          <div className="text-gray-500">{formatDate(reply.timestamp)}</div>
-                        </div>
-                        <p className="pl-6">{reply.text}</p> {/* Indent reply text */}
-                      </div>
-                    ))}
-
+                    {comment.replies.map((reply: Reply) => ( <div key={reply.id} className="text-xs py-1"> <div className="flex items-center mb-1"> <div className="w-5 h-5 rounded-full bg-gray-400 flex items-center justify-center text-white mr-1.5"> <User size={10} /> </div> <div className="font-medium mr-1">{reply.user}</div> <div className="text-gray-500">{formatDate(reply.timestamp)}</div> </div> <p className="pl-6">{reply.text}</p> </div> ))}
                     {/* Reply Input - Show only when comment is active */}
-                    {activeComment === comment.id && (
-                      <div className="flex items-center mt-2 pt-2 border-t border-gray-200">
-                        <input
-                          type="text"
-                          placeholder="Reply..."
-                          className="flex-1 border rounded-l px-2 py-1 text-xs"
-                          onClick={(e) => e.stopPropagation()} // Prevent card click
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
-                              addReply(comment.id, (e.target as HTMLInputElement).value);
-                              (e.target as HTMLInputElement).value = ''; // Clear input
-                            }
-                          }}
-                        />
-                        <button
-                          className="bg-blue-500 text-white rounded-r p-1 text-xs hover:bg-blue-600"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent card click
-                            const input = (e.target as HTMLElement).closest('div')?.querySelector('input');
-                            if (input && input.value.trim()) {
-                                addReply(comment.id, input.value);
-                                input.value = ''; // Clear input
-                            }
-                          }}
-                        >
-                          Reply
-                        </button>
-                      </div>
-                    )}
+                    {activeComment === comment.id && ( <div className="flex items-center mt-2 pt-2 border-t border-gray-200"> <input type="text" placeholder="Reply..." className="flex-1 border rounded-l px-2 py-1 text-xs" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) { addReply(comment.id, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }} /> <button className="bg-blue-500 text-white rounded-r p-1 text-xs hover:bg-blue-600" onClick={(e) => { e.stopPropagation(); const input = (e.target as HTMLElement).closest('div')?.querySelector('input'); if (input && input.value.trim()) { addReply(comment.id, input.value); input.value = ''; } }}> Reply </button> </div> )}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+              )) // End comments.map
+            )} {/* End Conditional Rendering */}
+          </div> {/* End Comments List Container */}
+        </div> {/* End Comments Sidebar */}
+      </div> // End Main Flex Container
   );
 };
 

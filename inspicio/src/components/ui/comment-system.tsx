@@ -155,7 +155,7 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
         parts.push(
           <span
             key={comment.id}
-            className={`${activeComment === comment.id ? 'bg-yellow-300' : 'bg-yellow-100'} cursor-pointer`}
+            className={`${activeComment === comment.id ? 'bg-[#8aa88a]' : 'bg-[#a7c9a7]'} cursor-pointer`}
             onClick={(e) => {
               e.stopPropagation();
               handleHighlightClick(comment.id);
