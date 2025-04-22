@@ -35,6 +35,14 @@ interface Label {
   label: string;
 }
 
+// Add a type for Trajectory based on usage
+interface TrajectorySummary {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
 interface ConversationEntry {
   agent_id: string;
   timestamp: string;
@@ -228,7 +236,7 @@ function SotopiaDashboard() {
                     description: label.label,
                     timestamp: label.label.split('|')[2]?.trim() || ""
                   }))}
-                  onSelectTrajectory={(trajectory) => {
+                  onSelectTrajectory={(trajectory: TrajectorySummary) => {
                     fetchConversation(trajectory.id);
                     setOpen(false);
                   }}
@@ -267,7 +275,7 @@ function SotopiaDashboard() {
                             agents={agents}
                             date={date}
                             isSelected={selectedInstance === item.instance_id}
-                            onClick={(id) => {
+                            onClick={(id: string) => {
                               fetchConversation(id);
                             }}
                           />
@@ -318,7 +326,7 @@ function SotopiaDashboard() {
                  agentIds.map((agentId, index) => (
                    <div key={agentId} className={index > 0 ? "mt-4 border-t pt-4" : ""}>
                      {/* Optional: Add a header indicating which agent this CommentSystem is for */}
-                     <h3 className="text-md font-semibold mb-2 px-4">Annotate as: {agentId}</h3>
+                     <h3 className="text-md font-semibold mb-2 px-4">Annotating: {agentId}</h3>
                      <CommentSystem
                        // Pass the formatted conversation string
                        initialText={formatConversationToString(conversation)}

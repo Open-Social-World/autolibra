@@ -136,7 +136,7 @@ async def main(dataset_name: str, metric_path: str) -> None:
 if __name__ == "__main__":
     asyncio.run(
         main(
-            dataset_name="sotopia",
-            metric_path=".data/metrics/sotopia/8_metrics",
+            dataset_name="webarena",
+            metric_path=".data/metrics/webarena/8_metrics",
         ),
     )

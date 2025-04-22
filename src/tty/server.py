@@ -10,6 +10,7 @@ import logging
 from pydantic import BaseModel
 # Add datetime for timestamps
 from datetime import datetime
+import os # Import os for sorting agent files numerically
 
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
@@ -23,6 +24,15 @@ sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
 dataset_path = Path(__file__).parent.parent.parent / ".data" / "sotopia"
 # Define annotation path
 annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations" / "sotopia"
+# --- Add path for WebArena data ---
+webarena_dataset_path = Path(__file__).parent.parent.parent / ".data" / "webarena"
+# --- Add path for WebArena instances (still useful for direct access if needed, but not for listing via dataset) ---
+webarena_instances_path = webarena_dataset_path / "instances"
+# --- Add path for Sotopia metrics ---
+sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
+# --- Add path for WebArena metrics ---
+webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
+# --- End Add paths ---
 
 # Add at the top of the file
 logging.basicConfig(level=logging.INFO)
@@ -41,20 +51,53 @@ class AnnotationPayload(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize dataset, load labels, and initialize annotation system
-    global dataset, instance_labels, metric_set, annotation_system # Add annotation_system
+    global dataset, instance_labels, metric_set, annotation_system, webarena_instance_labels, webarena_dataset
     
-    # Initialize dataset
+    # Initialize Sotopia dataset
     dataset = MultiAgentDataset(name="sotopia", base_path=dataset_path)
     
-    # Load labels
-    labels_path = dataset_path / "instance_labels.json"
-    if labels_path.exists():
-        with open(labels_path, "r") as f:
-            instance_labels = json.load(f)
+    # Initialize WebArena dataset
+    try:
+        webarena_dataset = MultiAgentDataset(name="webarena", base_path=webarena_dataset_path)
+        logger.info(f"WebArena dataset initialized from {webarena_dataset_path}")
+    except Exception as e:
+        logger.error(f"Failed to initialize WebArena dataset: {e}", exc_info=True)
+        webarena_dataset = None # Set to None if initialization fails
+
+    # Load Sotopia labels
+    sotopia_labels_path = dataset_path / "instance_labels.json"
+    if sotopia_labels_path.exists():
+        try:
+            with open(sotopia_labels_path, "r") as f:
+                instance_labels = json.load(f)
+            logger.info(f"Sotopia labels loaded from {sotopia_labels_path}")
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from {sotopia_labels_path}. Initializing as empty.")
+            instance_labels = {}
+        except Exception as e:
+            logger.error(f"Error loading Sotopia labels from {sotopia_labels_path}: {e}. Initializing as empty.")
+            instance_labels = {}
     else:
-        logger.warning(f"Labels file not found at {labels_path}")
+        logger.warning(f"Sotopia labels file not found at {sotopia_labels_path}")
         instance_labels = {} # Initialize as empty dict if not found
     
+    # Load WebArena labels
+    webarena_labels_path = webarena_dataset_path / "instance_labels.json"
+    if webarena_labels_path.exists():
+        try:
+            with open(webarena_labels_path, "r") as f:
+                webarena_instance_labels = json.load(f)
+            logger.info(f"WebArena labels loaded from {webarena_labels_path}")
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from {webarena_labels_path}. Initializing as empty.")
+            webarena_instance_labels = {}
+        except Exception as e:
+            logger.error(f"Error loading WebArena labels from {webarena_labels_path}: {e}. Initializing as empty.")
+            webarena_instance_labels = {}
+    else:
+        logger.warning(f"WebArena labels file not found at {webarena_labels_path}")
+        webarena_instance_labels = {} # Initialize as empty dict if not found
+
     # Try to load metrics
     try:
         metric_set = MetricSet(name="sotopia", base_path=dataset_path, induced_from="sotopia")
@@ -114,34 +157,84 @@ def read_root():
 
 @app.get("/trajectories")
 def get_label():
-    """Get all instance IDs with their labels"""
+    """Get all Sotopia instance IDs with their labels"""
     if not dataset:
         raise HTTPException(status_code=500, detail="Dataset not initialized")
-    
+
     instances = dataset.list_instances()
     result = []
-    
+
     for instance_id in instances:
         try:
-            # Get label if available
+            # Get label if available from Sotopia labels
             label = instance_labels.get(instance_id, "Unlabeled")
-            
+
             result.append({
                 "instance_id": instance_id,
                 "label": label
             })
         except Exception as e:
-            print(f"Error loading instance {instance_id}: {str(e)}")
-    
+            # Log specific error for Sotopia instance loading
+            logger.error(f"Error processing Sotopia instance {instance_id}: {str(e)}")
+
     return result
+
+# --- UPDATED ENDPOINT for WebArena Instances ---
+@app.get("/webarena/trajectories")
+def get_webarena_label():
+    """Get all WebArena instance IDs with their labels"""
+    # Use the WebArena dataset object to list instances
+    global webarena_dataset # Ensure access to the global dataset object
+    if not webarena_dataset:
+        logger.error("WebArena dataset not initialized.")
+        raise HTTPException(status_code=500, detail="WebArena dataset not initialized")
+
+    try:
+        instances = webarena_dataset.list_instances()
+        # Sort numerically if possible, otherwise alphabetically (MultiAgentDataset might already sort)
+        try:
+            instances.sort(key=int)
+        except ValueError:
+            instances.sort() # Fallback sort
+    except Exception as e:
+        logger.error(f"Error listing WebArena instances using dataset object: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list WebArena instances")
+
+    result = []
+
+    if not instances:
+        logger.info("No WebArena instances found by dataset object.")
+        return []
+
+    # Check if webarena_instance_labels were loaded
+    if 'webarena_instance_labels' not in globals():
+         logger.warning("WebArena instance labels dictionary not found in global scope.")
+         # Consider how critical labels are - maybe proceed without them or raise error
+
+    for instance_id in instances:
+        try:
+            # Get label if available from WebArena labels
+            label = globals().get('webarena_instance_labels', {}).get(instance_id, "Unlabeled")
+
+            result.append({
+                "instance_id": instance_id,
+                "label": label
+            })
+        except Exception as e:
+            # Log specific error for WebArena instance processing
+            logger.error(f"Error processing WebArena instance {instance_id} data: {str(e)}")
+            # Optionally skip this instance or add a placeholder
+
+    return result
+# --- END UPDATED ENDPOINT ---
 
 @app.get("/metrics/instances")
 def get_metrics_by_instance():
     """Get a mapping of instance IDs to their available metrics"""
-    metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
+    metrics_file = sotopia_metrics_file
     
     if not metrics_file.exists():
-        logger.warning(f"Metrics file not found at {metrics_file}")
+        logger.warning(f"Sotopia metrics file not found at {metrics_file}")
         return {}
     
     # Create a mapping of instance_id -> agent_id -> metrics
@@ -189,11 +282,11 @@ def get_metrics_by_instance():
 @app.get("/api/instances/{instance_id}/metrics/{agent_id}")
 async def get_instance_agent_metrics(instance_id: str, agent_id: str):
     """Get metrics for a specific agent within a specific instance."""
-    logger.info(f"Attempting to get metrics for instance='{instance_id}', agent='{agent_id}'")
-    metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
+    logger.info(f"Attempting to get Sotopia metrics for instance='{instance_id}', agent='{agent_id}'")
+    metrics_file = sotopia_metrics_file
 
     if not metrics_file.exists():
-        logger.warning(f"Metrics file not found at {metrics_file} for instance {instance_id}, agent {agent_id}")
+        logger.warning(f"Sotopia metrics file not found at {metrics_file} for instance {instance_id}, agent {agent_id}")
         raise HTTPException(status_code=404, detail="Metrics file not found")
 
     try:
@@ -379,6 +472,150 @@ async def create_annotation(payload: AnnotationPayload):
         logger.error(f"Failed to save annotation: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to save annotation: {str(e)}")
 # --- END NEW ANNOTATION ENDPOINT ---
+
+@app.get("/webarena/trajectories/{instance_id}")
+def get_webarena_trajectory(instance_id: str):
+    """Get full trajectory data for a specific WebArena instance"""
+    if not webarena_dataset:
+        raise HTTPException(status_code=500, detail="WebArena dataset not initialized")
+    
+    try:
+        metadata = webarena_dataset.get_instance_metadata(instance_id)
+        
+        # Extract scenario from metadata
+        scenario = ""
+        if metadata and hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
+            scenario = metadata.metadata.get("scenario", "")
+            
+            # Clean the scenario text
+            if scenario:
+                # Remove HTML tags
+                scenario = re.sub(r'<.*?>', '', scenario)
+                
+                # Remove any text after a period followed by a space if it contains HTML-like content
+                match = re.search(r'\.\s+.*?<', scenario)
+                if match:
+                    scenario = scenario[:match.start() + 1]
+                
+                # Trim whitespace
+                scenario = scenario.strip()
+        
+        # Get trajectory data
+        conversation = []
+        
+        for agent_id in metadata.agents:
+            trajectory = webarena_dataset.get_trajectory(instance_id, agent_id)
+            
+            # Sort trajectory points by timestamp
+            trajectory_points = [
+                (point, trajectory.get_data_at(idx))
+                for idx, point in enumerate(trajectory.points)
+            ]
+            trajectory_points.sort(key=lambda x: x[0].timestamp)
+            
+            # Extract actions (which contain dialogue)
+            for point, data in trajectory_points:
+                if point.point_type == PointType.ACTION:
+                    # Extract the dialogue from the action
+                    content = None
+                    
+                    if isinstance(data, dict) and "content" in data:
+                        content = data.get("content", "")
+                    elif isinstance(data, str):
+                        content = data
+                    else:
+                        # Try to convert to string if it's not a dict or string
+                        try:
+                            content = str(data)
+                        except:
+                            continue
+                    
+                    if content:
+                        # Clean up content if needed
+                        if isinstance(content, str):
+                            # Remove escaped characters
+                            content = content.replace("\\n", "\n").replace('\\"', '"')
+                        
+                        conversation.append({
+                            "agent_id": agent_id,
+                            "timestamp": point.timestamp.isoformat(),
+                            "content": content
+                        })
+        
+        # Sort all conversation entries by timestamp
+        conversation.sort(key=lambda x: x["timestamp"])
+        
+        return {
+            "instance_id": instance_id,
+            "conversation": conversation,
+            "scenario": scenario
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving WebArena trajectory for {instance_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=404, detail=f"WebArena instance not found: {str(e)}")
+
+
+# --- NEW ENDPOINT for Specific WebArena Metrics ---
+@app.get("/webarena/instances/{instance_id}/metrics/{agent_id}")
+async def get_webarena_instance_agent_metrics(instance_id: str, agent_id: str):
+    """Get metrics for a specific WebArena instance (agent_id must be 'agent')."""
+    logger.info(f"Attempting to get WebArena metrics for instance='{instance_id}', agent='{agent_id}'")
+
+    # --- Validate requested agent_id ---
+    if agent_id != "agent":
+        logger.warning(f"Invalid agent_id '{agent_id}' requested for WebArena instance '{instance_id}'. Only 'agent' is supported.")
+        raise HTTPException(status_code=400, detail="Invalid agent_id for WebArena. Only 'agent' is supported.")
+    # --- End Validation ---
+
+    if not webarena_metrics_file.exists():
+        logger.warning(f"WebArena metrics file not found at {webarena_metrics_file} for instance {instance_id}, agent {agent_id}")
+        raise HTTPException(status_code=404, detail="WebArena metrics file not found")
+
+    try:
+        line_number = 0
+        with open(webarena_metrics_file, "r") as f:
+            for line in f:
+                line_number += 1
+                try:
+                    metric_data = json.loads(line)
+                    file_instance_id = metric_data.get("instance_id")
+                    # --- Check agent_id in file ---
+                    file_agent_id = metric_data.get("agent_id")
+                    if file_agent_id != "agent":
+                        # Silently skip lines with incorrect agent_id in the file
+                        continue
+                    # --- End Check ---
+
+                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
+                    ids_match = file_instance_id == instance_id
+                    # agents_match is implicitly true if we reach here, as both request and file agent_id must be 'agent'
+                    logger.debug(f"Line {line_number}: Instance match: {ids_match}")
+
+                    if ids_match: # Only need to check instance ID now
+                        logger.info(f"Found WebArena match on line {line_number} for instance='{instance_id}', agent='agent'")
+                        response_data = {}
+                        for key, value in metric_data.items():
+                             if isinstance(value, (int, float)) or (key.endswith("_reasoning") and isinstance(value, str)):
+                                 response_data[key] = value
+                        # Return the validated agent_id from the request
+                        response_data["instance_id"] = instance_id
+                        response_data["agent_id"] = agent_id # Should always be 'agent'
+                        return response_data
+                except json.JSONDecodeError:
+                    logger.error(f"Error parsing JSON on line {line_number} in WebArena metrics file: {line.strip()}")
+                    continue
+                except Exception as e: # Catch other potential errors per line
+                    logger.error(f"Error processing line {line_number} in WebArena metrics file: {line.strip()} - {e}")
+                    continue
+
+        # If loop finishes without finding a match for the instance_id with agent_id='agent'
+        logger.warning(f"WebArena metrics search completed. No match found for instance {instance_id} (with agent_id='agent') after checking {line_number} lines.")
+        raise HTTPException(status_code=404, detail="Metrics not found for this WebArena instance with agent_id='agent'")
+
+    except Exception as e:
+        logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
+# --- END NEW ENDPOINT ---
 
 if __name__ == "__main__":
     import uvicorn

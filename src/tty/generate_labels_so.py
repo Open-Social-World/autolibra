@@ -1,10 +1,6 @@
 from pathlib import Path
 import sys
 import json
-
-# Add the package directory to the Python path
-sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
-
 from osw_data.dataset import MultiAgentDataset, DataInstance
 from osw_data.trajectory import PointType
 from datetime import datetime
@@ -12,6 +8,7 @@ import openai
 from pydantic import BaseModel
 import os
 import re
+sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
 
 class DialogueSummary(BaseModel):
     summary: str
