@@ -164,8 +164,38 @@ function WebArenaDashboard() {
         // Use keys from ConversationEntry
         const timestampStr = formatTimestamp(entry.timestamp);
         const agentId = entry.agent_id || 'Unknown';
-        const content = entry.content || '';
-        return `[${timestampStr}] ${agentId}: ${content}`;
+        
+        // Clean up the agent ID for display (capitalize first letter)
+        const displayAgentId = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+        
+        // Clean up the content
+        let content = entry.content || '';
+        
+        // Extract description using regex pattern matching
+        const descriptionMatch = content.match(/'description':\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) || 
+                                content.match(/"description":\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
+                                content.match(/'description':\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
+                                content.match(/"description":\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) ;
+        
+        if (descriptionMatch && descriptionMatch[1]) {
+          content = descriptionMatch[1];
+        } else {
+          // If no description, try to extract text field
+          const textMatch = content.match(/'text':\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) || 
+                           content.match(/"text":\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
+                           content.match(/'text':\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
+                           content.match(/"text":\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) ;
+          
+          if (textMatch && textMatch[1]) {
+            content = textMatch[1];
+          }
+        }
+        
+        // Remove any remaining escaped quotes and clean up
+        content = content.replace(/\\'/g, "'").replace(/\\"/g, '"');
+        
+        // Return the formatted entry
+        return `[${timestampStr}] ${displayAgentId}: ${content}`;
       })
       .join('\n\n');
   };
