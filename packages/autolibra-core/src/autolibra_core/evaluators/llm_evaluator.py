@@ -70,7 +70,7 @@ async def eval_instance(
                         {"role": "user", "content": prompt},
                     ],
                     response_format=_make_evaluation_result_class(metrics),
-                    reasoning_effort="medium",
+                    reasoning_effort="high",
                 )
 
                 if not completion.choices[0].message.parsed:
