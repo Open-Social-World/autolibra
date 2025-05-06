@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import os # Import os for sorting agent files numerically
 from fastapi.responses import FileResponse
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import psycopg2
 import psycopg2.extras  # For better handling of query results
 
@@ -36,10 +36,9 @@ webarena_instances_path = webarena_dataset_path / "instances"
 sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
 # --- Add path for WebArena metrics ---
 webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
+# --- Add path for WebArena mock dataset ---
+webarena_mock_path = Path(__file__).parent.parent.parent / "inspicio" / ".data" / "extracted" / "nnetnav_openweb_3"
 # --- End Add paths ---
-
-# --- Add path for WebArena mock data ---
-webarena_mock_path = Path(__file__).parent.parent.parent / ".data" / "webarena_mock"
 
 # Add at the top of the file
 logging.basicConfig(level=logging.INFO)
@@ -651,222 +650,215 @@ async def get_webarena_instance_agent_metrics(instance_id: str, agent_id: str):
         raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
 # --- END NEW ENDPOINT ---
 
-# --- NEW ENDPOINT for WebArena Mock Data ---
-@app.get("/webarena/mock/files")
-async def get_webarena_mock_files():
-    """List all experiment logs and screenshots in the WebArena mock folder"""
-    if not webarena_mock_path.exists():
-        logger.warning(f"WebArena mock folder not found at {webarena_mock_path}")
-        raise HTTPException(status_code=404, detail="WebArena mock folder not found")
-    
-    try:
-        # Dictionary to store experiment logs and their associated screenshots
-        result: Dict[str, Dict[str, List[str]]] = {}
-        
-        # List all files in the directory
-        for file_path in webarena_mock_path.glob("**/*"):
-            if file_path.is_file():
-                # Get relative path from the mock folder
-                rel_path = file_path.relative_to(webarena_mock_path)
-                # Get experiment folder name (first part of path)
-                if len(rel_path.parts) > 0:
-                    experiment_id = rel_path.parts[0]
-                    
-                    # Initialize experiment entry if not exists
-                    if experiment_id not in result:
-                        result[experiment_id] = {
-                            "logs": [],
-                            "screenshots": []
-                        }
-                    
-                    # Categorize file
-                    file_name = file_path.name
-                    if file_name.endswith(".log"):
-                        result[experiment_id]["logs"].append(str(rel_path))
-                    elif file_name.endswith((".png", ".jpg", ".jpeg")):
-                        result[experiment_id]["screenshots"].append(str(rel_path))
-        
-        return result
-    
-    except Exception as e:
-        logger.error(f"Error listing WebArena mock files: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list WebArena mock files: {str(e)}")
-
-@app.get("/webarena/mock/file/{file_path:path}")
-async def get_webarena_mock_file(file_path: str):
-    """Get a specific file from the WebArena mock folder"""
-    # Construct the full path
-    full_path = webarena_mock_path / file_path
-    
-    # Security check: ensure the path is within the mock folder
-    try:
-        # resolve() handles symlinks and relative paths
-        resolved_path = full_path.resolve()
-        resolved_mock_path = webarena_mock_path.resolve()
-        
-        if not str(resolved_path).startswith(str(resolved_mock_path)):
-            logger.warning(f"Attempted path traversal: {file_path}")
-            raise HTTPException(status_code=403, detail="Access denied")
-    except Exception as e:
-        logger.error(f"Path resolution error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Invalid path")
-    
-    # Check if file exists
-    if not full_path.exists() or not full_path.is_file():
-        logger.warning(f"File not found: {file_path}")
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    try:
-        # Determine content type based on file extension
-        content_type = None
-        if full_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
-            content_type = f"image/{full_path.suffix.lower()[1:]}"
-        elif full_path.suffix.lower() == '.log':
-            content_type = "text/plain"
-        
-        # Return the file with appropriate content type
-        return FileResponse(
-            path=str(full_path),
-            media_type=content_type,
-            filename=full_path.name
-        )
-    
-    except Exception as e:
-        logger.error(f"Error serving file {file_path}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to serve file: {str(e)}")
-# --- END NEW ENDPOINT ---
-
-@app.get("/webarena/db/files")
-async def get_webarena_db_files():
-    """List all experiment logs and screenshots from the database"""
+@app.get("/webarena/mock/instances")
+def get_webarena_mock_instances():
+    """Get all WebArena mock instances from the database"""
     if not db_conn:
+        logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
+        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Query to get all experiment logs
+        # Query to get distinct experiment folders and their descriptions
         cursor.execute("""
-            SELECT filepath, filename, filetype, description 
+            SELECT DISTINCT 
+                regexp_replace(filepath, '/[^/]*$', '') as folder_path,
+                description
             FROM files 
-            WHERE filepath LIKE 'nnetnav_openweb_3/%' 
-            AND (filepath LIKE '%experiment.log' OR filetype LIKE 'image/%')
-            ORDER BY filepath
+            WHERE filepath LIKE 'nnetnav_openweb_%/%'
+            AND description IS NOT NULL
+            ORDER BY folder_path
         """)
         
-        files = cursor.fetchall()
-        cursor.close()
+        results = cursor.fetchall()
         
-        # Dictionary to store experiment logs and their associated screenshots
-        result = {}
-        
-        for file in files:
-            # Extract experiment folder from filepath
-            filepath = file['filepath']
-            parts = filepath.split('/')
+        # Format the results
+        instances = []
+        for row in results:
+            folder_path = row['folder_path']
+            description = row['description']
             
+            # Extract instance_id from the folder path
+            # Assuming format like 'nnetnav_openweb_3/experiment_123'
+            parts = folder_path.split('/')
             if len(parts) >= 2:
-                experiment_id = parts[1]  # The second part should be the experiment ID
-                
-                # Initialize experiment entry if not exists
-                if experiment_id not in result:
-                    result[experiment_id] = {
-                        "logs": [],
-                        "screenshots": [],
-                        "description": file.get('description', 'Unlabeled')
-                    }
-                
-                # Categorize file
-                if filepath.endswith('.log'):
-                    result[experiment_id]["logs"].append({
-                        "path": filepath,
-                        "name": file['filename']
-                    })
-                elif file['filetype'].startswith('image/'):
-                    result[experiment_id]["screenshots"].append({
-                        "path": filepath,
-                        "name": file['filename']
-                    })
+                instance_id = parts[1]  # Get the experiment_XXX part
+            else:
+                instance_id = folder_path
+            
+            instances.append({
+                "instance_id": instance_id,
+                "label": description or "Unlabeled",
+                "folder_path": folder_path
+            })
         
-        return result
-    
+        cursor.close()
+        return instances
+        
     except Exception as e:
-        logger.error(f"Error querying database for WebArena files: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+        logger.error(f"Error querying WebArena mock instances: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-@app.get("/webarena/db/file/{file_path:path}")
-async def get_webarena_db_file(file_path: str):
-    """Get a specific file from the database"""
+@app.get("/webarena/mock/instances/{instance_id}")
+def get_webarena_mock_instance(instance_id: str):
+    """Get details for a specific WebArena mock instance"""
     if not db_conn:
+        logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
+        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Query to get the file content
+        # First, find the folder path for this instance_id
         cursor.execute("""
-            SELECT filetype, filedata 
+            SELECT DISTINCT regexp_replace(filepath, '/[^/]*$', '') as folder_path
             FROM files 
-            WHERE filepath = %s
-        """, (file_path,))
+            WHERE filepath LIKE %s
+            LIMIT 1
+        """, (f'%/{instance_id}/%',))
         
-        file = cursor.fetchone()
+        folder_result = cursor.fetchone()
+        if not folder_result:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
+        
+        folder_path = folder_result['folder_path']
+        
+        # Get all files for this instance
+        cursor.execute("""
+            SELECT id, filename, filepath, filetype, filesize, 
+                   created_at, description, metadata
+            FROM files 
+            WHERE filepath LIKE %s
+            ORDER BY filepath, filename
+        """, (f'{folder_path}/%',))
+        
+        files = []
+        log_content = None
+        
+        for row in cursor.fetchall():
+            file_data = dict(row)
+            
+            # Convert datetime to string for JSON serialization
+            if file_data['created_at']:
+                file_data['created_at'] = file_data['created_at'].isoformat()
+            
+            # Parse metadata JSON if it exists
+            if file_data['metadata'] and isinstance(file_data['metadata'], str):
+                try:
+                    file_data['metadata'] = json.loads(file_data['metadata'])
+                except:
+                    pass
+            
+            files.append(file_data)
+            
+            # If this is the experiment.log file, read its content
+            if file_data['filename'] == 'experiment.log':
+                try:
+                    # Fix the filepath by removing duplicate nnetnav_openweb_3 if present
+                    filepath = file_data['filepath'].lstrip('/')
+                    if filepath.startswith('nnetnav_openweb_3/nnetnav_openweb_3/'):
+                        filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
+                    
+                    # Try the corrected path first
+                    log_path = os.path.join(webarena_mock_path.parent, filepath)
+                    
+                    if not os.path.exists(log_path):
+                        # Try the original path as fallback
+                        alt_log_path = os.path.join(webarena_mock_path, file_data['filepath'].lstrip('/'))
+                        if os.path.exists(alt_log_path):
+                            log_path = alt_log_path
+                    
+                    if os.path.exists(log_path):
+                        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            log_content = f.read()
+                    else:
+                        logger.error(f"Log file not found at: {log_path}")
+                except Exception as e:
+                    logger.error(f"Error reading log file: {str(e)}")
+        
+        # Get the description (task) for this instance
+        cursor.execute("""
+            SELECT description 
+            FROM files 
+            WHERE filepath LIKE %s 
+            AND description IS NOT NULL 
+            LIMIT 1
+        """, (f'{folder_path}/%',))
+        
+        description_row = cursor.fetchone()
+        description = description_row['description'] if description_row else "Unknown Task"
+        
         cursor.close()
         
-        if not file:
-            raise HTTPException(status_code=404, detail="File not found in database")
+        return {
+            "instance_id": instance_id,
+            "folder_path": folder_path,
+            "description": description,
+            "files": files,
+            "log_content": log_content
+        }
         
-        # Determine content type
-        content_type = file['filetype'] or "application/octet-stream"
-        
-        # For text files, return as text
-        if content_type.startswith("text/"):
-            return Response(content=file['filedata'], media_type=content_type)
-        
-        # For binary files (like images), return as binary
-        return Response(content=file['filedata'], media_type=content_type)
-    
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error retrieving file {file_path} from database: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+        logger.error(f"Error querying WebArena mock instance {instance_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-@app.get("/webarena/db/tasks")
-async def get_webarena_task_descriptions():
-    """Get all task descriptions from the database"""
+@app.get("/webarena/mock/files/{file_id}")
+def get_webarena_mock_file(file_id: int):
+    """Get a specific file from the WebArena mock dataset"""
     if not db_conn:
+        logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
+        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Query to get unique task descriptions
+        # Get the file record
         cursor.execute("""
-            SELECT DISTINCT description, 
-                   regexp_replace(filepath, '/[^/]*$', '') as folder_path
+            SELECT id, filename, filepath, filetype 
             FROM files 
-            WHERE description IS NOT NULL
-            AND filepath LIKE 'nnetnav_openweb_3/%'
-            ORDER BY description
-        """)
+            WHERE id = %s
+        """, (file_id,))
         
-        tasks = cursor.fetchall()
+        file_record = cursor.fetchone()
         cursor.close()
         
-        result = {}
-        for task in tasks:
-            description = task['description']
-            folder = task['folder_path']
-            
-            if description not in result:
-                result[description] = []
-            
-            result[description].append(folder)
+        if not file_record:
+            raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
         
-        return result
-    
+        # Fix the filepath by removing duplicate nnetnav_openweb_3 if present
+        filepath = file_record['filepath'].lstrip('/')
+        if filepath.startswith('nnetnav_openweb_3/nnetnav_openweb_3/'):
+            filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
+        
+        # Construct the full path to the file
+        file_path = os.path.join(webarena_mock_path.parent, filepath)
+        
+        if not os.path.exists(file_path):
+            # Try an alternative path as fallback
+            alt_file_path = os.path.join(webarena_mock_path, file_record['filepath'].lstrip('/'))
+            if not os.path.exists(alt_file_path):
+                logger.error(f"File not found on disk: {file_path} or {alt_file_path}")
+                raise HTTPException(status_code=404, detail=f"File not found on disk: {file_path}")
+            file_path = alt_file_path
+        
+        # Return the file
+        return FileResponse(
+            path=file_path,
+            filename=file_record['filename'],
+            media_type=file_record['filetype']
+        )
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error querying task descriptions from database: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+        logger.error(f"Error retrieving file {file_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving file: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
