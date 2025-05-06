@@ -6,8 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/Header"; 
 import { MessageSquare, Users, Calendar, TrendingUp } from 'lucide-react';
-import { LabeledButton } from "@/components/webarena_ui/LabeledButton"; // Updated path
-import MetricSidebar from "@/components/webarena_ui/MetricSidebar"; // Updated path
+import { LabeledButton } from "@/components/webarena_mock_ui/LabeledButton"; // Updated path
+import MetricSidebar from "@/components/webarena_mock_ui/MetricSidebar"; // Updated path
 import webarenaLogo from "../assets/WebArenaMascot.png"; // Assuming a webarena logo exists
 import { useNavigate } from "react-router-dom";
 import TrajectorySearchBar from "@/components/webarena_ui/trajectory-searchbar"; // Updated path
@@ -27,6 +27,13 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"; 
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 
 // Interface matches /webarena/trajectories output
@@ -57,7 +64,7 @@ interface ConversationData {
   scenario?: string; // Matches backend key
 }
 
-function WebArenaDashboard() {
+function WebArenaMock() {
   const [labels, setLabels] = useState<Label[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
@@ -70,6 +77,12 @@ function WebArenaDashboard() {
   const [trajectoryRefs, setTrajectoryRefs] = useState<{ [key: string]: React.RefObject<HTMLDivElement> }>({});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [screenshots, setScreenshots] = useState<string[]>([]);
+  const [screenshotsLoading, setScreenshotsLoading] = useState(false);
+  const [currentScreenshotIndex, setCurrentScreenshotIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchLabels() {
@@ -96,8 +109,14 @@ function WebArenaDashboard() {
     setConversation([]);
 
     try {
+      // For our single "Comparing iphones" button, we'll use a fixed instance ID
+      // but keep the original logic for future expansion
+      const targetId = instanceId === "iphone-comparison" ? 
+        (labels.length > 0 ? labels[0].instance_id : instanceId) : 
+        instanceId;
+      
       // Use the WebArena-specific endpoint
-      const response = await fetch(`http://localhost:8000/webarena/trajectories/${instanceId}`);
+      const response = await fetch(`http://localhost:8000/webarena/trajectories/${targetId}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data: ConversationData = await response.json();
       setConversation(data.conversation || []);
@@ -203,6 +222,112 @@ function WebArenaDashboard() {
   // Filter agent IDs for metrics sidebar (only 'agent')
   const agentIdsForMetrics = getAgentIds().filter(id => id === 'agent');
 
+  // Add function to fetch screenshots
+  async function fetchScreenshots() {
+    setScreenshotsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/webarena/mock/files");
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      
+      // Find the experiment with "iphone" in the name
+      const iphoneExperiment = Object.keys(data).find(exp => 
+        exp.toLowerCase().includes("iphone")
+      );
+      
+      if (iphoneExperiment && data[iphoneExperiment].screenshots) {
+        // Get the full URLs for the screenshots
+        const screenshotUrls = data[iphoneExperiment].screenshots.map(
+          (path: string) => `http://localhost:8000/webarena/mock/file/${path}`
+        );
+        setScreenshots(screenshotUrls);
+      } else {
+        // Fallback to the first experiment with screenshots if no iPhone experiment
+        const firstExpWithScreenshots = Object.keys(data).find(
+          exp => data[exp].screenshots && data[exp].screenshots.length > 0
+        );
+        
+        if (firstExpWithScreenshots) {
+          const screenshotUrls = data[firstExpWithScreenshots].screenshots.map(
+            (path: string) => `http://localhost:8000/webarena/mock/file/${path}`
+          );
+          setScreenshots(screenshotUrls);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching screenshots:", error);
+    } finally {
+      setScreenshotsLoading(false);
+    }
+  }
+
+  // Call fetchScreenshots when the component mounts
+  useEffect(() => {
+    fetchScreenshots();
+  }, []);
+
+  // Function to handle button click and show next screenshot
+  const handleButtonClick = (id: string) => {
+    // First set the selected instance
+    fetchConversation(id);
+    
+    // Then advance to the next screenshot if there are screenshots
+    if (screenshots.length > 0) {
+      // Increment the screenshot index, wrapping around if needed
+      setCurrentScreenshotIndex((prevIndex) => (prevIndex + 1) % screenshots.length);
+    }
+  };
+
+  // Get the current screenshot URL based on the index
+  const currentScreenshot = screenshots.length > 0 ? 
+    screenshots[currentScreenshotIndex] : null;
+
+  // Add a service to fetch files on demand
+  const fetchFileFromArchive = async (archivePath: string, filePath: string) => {
+    try {
+      const response = await fetch('/api/extract-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          archivePath,
+          filePath,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to extract file');
+      }
+      
+      // For images, get blob and create URL
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Error fetching file:', error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const loadImage = async () => {
+      const url = await fetchFileFromArchive(
+        'nnetnav_openweb_1.tar.gz', 
+        'nnetnav_openweb_1/screenshots/example.png'
+      );
+      setImageUrl(url);
+    };
+    
+    loadImage();
+    
+    // Clean up object URL on unmount
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, []);
+
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <Header
@@ -248,7 +373,7 @@ function WebArenaDashboard() {
                         description: "",
                         timestamp: "",
                     }))}
-                    onSelectTrajectory={(trajectory) => {
+                    onSelectTrajectory={(trajectory: TrajectorySummary) => {
                         fetchConversation(trajectory.id);
                     }}
                  />
@@ -264,22 +389,14 @@ function WebArenaDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-2 p-1">
-                    {(searchResults.length > 0 ? searchResults : labels).map((item) => {
-                      const topic = getTopicFromLabel(item.label);
-
-                      return (
-                        <div ref={trajectoryRefs[item.instance_id]} key={item.instance_id}>
-                          <LabeledButton
-                            id={item.instance_id}
-                            topic={topic}
-                            isSelected={selectedInstance === item.instance_id}
-                            onClick={(id: string) => {
-                              fetchConversation(id);
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
+                    <LabeledButton
+                      id="iphone-comparison"
+                      topic="Comparing iphones"
+                      isSelected={selectedInstance === "iphone-comparison"}
+                      onClick={(id: string) => {
+                        handleButtonClick(id);
+                      }}
+                    />
                   </div>
                 )}
               </ScrollArea>
@@ -293,18 +410,14 @@ function WebArenaDashboard() {
               {selectedInstance ? (
                 <div>
                   <Header
-                    title={
-                      selectedInstance
-                        ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label)
-                        : "Interaction Details"
-                    }
+                    title="Comparing iphones"
                     subtitle1={getConversationDate()}
                     subtitle1Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
                     className="mb-0 pb-4"
                   />
                 </div>
               ) : (
-                <CardTitle>Select an interaction</CardTitle>
+                <CardTitle>iPhone Comparison Screenshots</CardTitle>
               )}
               {scenario && (
                 <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm">
@@ -313,22 +426,27 @@ function WebArenaDashboard() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="flex-grow p-0 overflow-y-auto">
-              {conversationLoading ? (
-                <div className="p-6 text-center text-muted-foreground">Loading Interaction...</div>
-              ) : selectedInstance && conversation.length > 0 ? (
-                <ScrollArea className="h-full">
-                  <div className="p-4 lg:p-6">
-                    <Card className="border shadow-sm">
-                      <CardContent className="p-4 text-base whitespace-pre-wrap">
-                        {formatConversationToString(conversation)}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </ScrollArea>
+            <CardContent className="flex-grow p-4 overflow-y-auto">
+              {screenshotsLoading ? (
+                <div className="p-6 text-center text-muted-foreground">Loading Screenshots...</div>
+              ) : currentScreenshot ? (
+                <div className="p-1">
+                  <Card>
+                    <CardContent className="flex aspect-square items-center justify-center p-2">
+                      <img 
+                        src={currentScreenshot} 
+                        alt={`Screenshot ${currentScreenshotIndex + 1} of ${screenshots.length}`} 
+                        className="max-h-full max-w-full object-contain"
+                      />
+                      <div className="absolute bottom-4 right-4 bg-background/80 px-2 py-1 rounded-md text-sm">
+                        {currentScreenshotIndex + 1} / {screenshots.length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               ) : (
                 <div className="p-6 text-center text-muted-foreground h-full flex items-center justify-center">
-                  {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
+                  No screenshots available.
                 </div>
               )}
             </CardContent>
@@ -369,4 +487,4 @@ function WebArenaDashboard() {
   );
 }
 
-export default WebArenaDashboard;
+export default WebArenaMock;

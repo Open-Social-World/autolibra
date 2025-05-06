@@ -49,7 +49,6 @@ def download_github_folder(
             print(f"Processed directory: {item['path']}")
 
         elif item["type"] == "file":
-            # Skip if file already exists and has same size
             if local_path.exists():
                 # Get local file size
                 local_size = local_path.stat().st_size

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import json
@@ -11,6 +11,10 @@ from pydantic import BaseModel
 # Add datetime for timestamps
 from datetime import datetime
 import os # Import os for sorting agent files numerically
+from fastapi.responses import FileResponse
+from typing import List, Dict, Optional
+import psycopg2
+import psycopg2.extras  # For better handling of query results
 
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
@@ -34,6 +38,9 @@ sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics"
 webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
 # --- End Add paths ---
 
+# --- Add path for WebArena mock data ---
+webarena_mock_path = Path(__file__).parent.parent.parent / ".data" / "webarena_mock"
+
 # Add at the top of the file
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,10 +55,35 @@ class AnnotationPayload(BaseModel):
     start_offset: int
     end_offset: int
 
+# Database connection parameters
+DB_CONFIG = {
+    "dbname": "inspiciodb",
+    "user": "postgres",
+    "password": "Yankayee123",
+    "host": "localhost"
+}
+
+# Function to get database connection
+def get_db_connection():
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize dataset, load labels, and initialize annotation system
-    global dataset, instance_labels, metric_set, annotation_system, webarena_instance_labels, webarena_dataset
+    global dataset, instance_labels, metric_set, annotation_system, webarena_instance_labels, webarena_dataset, db_conn
+    
+    # Initialize database connection
+    try:
+        db_conn = get_db_connection()
+        logger.info("Database connection established")
+    except Exception as e:
+        logger.error(f"Failed to initialize database connection: {e}", exc_info=True)
+        db_conn = None
     
     # Initialize Sotopia dataset
     dataset = MultiAgentDataset(name="sotopia", base_path=dataset_path)
@@ -135,8 +167,10 @@ async def lifespan(app: FastAPI):
 
     yield
     
-    # Shutdown: Clean up resources if needed
-    # (No cleanup needed in this case)
+    # Shutdown: Clean up resources
+    if db_conn:
+        db_conn.close()
+        logger.info("Database connection closed")
 
 app = FastAPI(title="Conversation Dataset API", lifespan=lifespan)
 
@@ -616,6 +650,223 @@ async def get_webarena_instance_agent_metrics(instance_id: str, agent_id: str):
         logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
 # --- END NEW ENDPOINT ---
+
+# --- NEW ENDPOINT for WebArena Mock Data ---
+@app.get("/webarena/mock/files")
+async def get_webarena_mock_files():
+    """List all experiment logs and screenshots in the WebArena mock folder"""
+    if not webarena_mock_path.exists():
+        logger.warning(f"WebArena mock folder not found at {webarena_mock_path}")
+        raise HTTPException(status_code=404, detail="WebArena mock folder not found")
+    
+    try:
+        # Dictionary to store experiment logs and their associated screenshots
+        result: Dict[str, Dict[str, List[str]]] = {}
+        
+        # List all files in the directory
+        for file_path in webarena_mock_path.glob("**/*"):
+            if file_path.is_file():
+                # Get relative path from the mock folder
+                rel_path = file_path.relative_to(webarena_mock_path)
+                # Get experiment folder name (first part of path)
+                if len(rel_path.parts) > 0:
+                    experiment_id = rel_path.parts[0]
+                    
+                    # Initialize experiment entry if not exists
+                    if experiment_id not in result:
+                        result[experiment_id] = {
+                            "logs": [],
+                            "screenshots": []
+                        }
+                    
+                    # Categorize file
+                    file_name = file_path.name
+                    if file_name.endswith(".log"):
+                        result[experiment_id]["logs"].append(str(rel_path))
+                    elif file_name.endswith((".png", ".jpg", ".jpeg")):
+                        result[experiment_id]["screenshots"].append(str(rel_path))
+        
+        return result
+    
+    except Exception as e:
+        logger.error(f"Error listing WebArena mock files: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list WebArena mock files: {str(e)}")
+
+@app.get("/webarena/mock/file/{file_path:path}")
+async def get_webarena_mock_file(file_path: str):
+    """Get a specific file from the WebArena mock folder"""
+    # Construct the full path
+    full_path = webarena_mock_path / file_path
+    
+    # Security check: ensure the path is within the mock folder
+    try:
+        # resolve() handles symlinks and relative paths
+        resolved_path = full_path.resolve()
+        resolved_mock_path = webarena_mock_path.resolve()
+        
+        if not str(resolved_path).startswith(str(resolved_mock_path)):
+            logger.warning(f"Attempted path traversal: {file_path}")
+            raise HTTPException(status_code=403, detail="Access denied")
+    except Exception as e:
+        logger.error(f"Path resolution error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid path")
+    
+    # Check if file exists
+    if not full_path.exists() or not full_path.is_file():
+        logger.warning(f"File not found: {file_path}")
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        # Determine content type based on file extension
+        content_type = None
+        if full_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+            content_type = f"image/{full_path.suffix.lower()[1:]}"
+        elif full_path.suffix.lower() == '.log':
+            content_type = "text/plain"
+        
+        # Return the file with appropriate content type
+        return FileResponse(
+            path=str(full_path),
+            media_type=content_type,
+            filename=full_path.name
+        )
+    
+    except Exception as e:
+        logger.error(f"Error serving file {file_path}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to serve file: {str(e)}")
+# --- END NEW ENDPOINT ---
+
+@app.get("/webarena/db/files")
+async def get_webarena_db_files():
+    """List all experiment logs and screenshots from the database"""
+    if not db_conn:
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Query to get all experiment logs
+        cursor.execute("""
+            SELECT filepath, filename, filetype, description 
+            FROM files 
+            WHERE filepath LIKE 'nnetnav_openweb_3/%' 
+            AND (filepath LIKE '%experiment.log' OR filetype LIKE 'image/%')
+            ORDER BY filepath
+        """)
+        
+        files = cursor.fetchall()
+        cursor.close()
+        
+        # Dictionary to store experiment logs and their associated screenshots
+        result = {}
+        
+        for file in files:
+            # Extract experiment folder from filepath
+            filepath = file['filepath']
+            parts = filepath.split('/')
+            
+            if len(parts) >= 2:
+                experiment_id = parts[1]  # The second part should be the experiment ID
+                
+                # Initialize experiment entry if not exists
+                if experiment_id not in result:
+                    result[experiment_id] = {
+                        "logs": [],
+                        "screenshots": [],
+                        "description": file.get('description', 'Unlabeled')
+                    }
+                
+                # Categorize file
+                if filepath.endswith('.log'):
+                    result[experiment_id]["logs"].append({
+                        "path": filepath,
+                        "name": file['filename']
+                    })
+                elif file['filetype'].startswith('image/'):
+                    result[experiment_id]["screenshots"].append({
+                        "path": filepath,
+                        "name": file['filename']
+                    })
+        
+        return result
+    
+    except Exception as e:
+        logger.error(f"Error querying database for WebArena files: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+@app.get("/webarena/db/file/{file_path:path}")
+async def get_webarena_db_file(file_path: str):
+    """Get a specific file from the database"""
+    if not db_conn:
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Query to get the file content
+        cursor.execute("""
+            SELECT filetype, filedata 
+            FROM files 
+            WHERE filepath = %s
+        """, (file_path,))
+        
+        file = cursor.fetchone()
+        cursor.close()
+        
+        if not file:
+            raise HTTPException(status_code=404, detail="File not found in database")
+        
+        # Determine content type
+        content_type = file['filetype'] or "application/octet-stream"
+        
+        # For text files, return as text
+        if content_type.startswith("text/"):
+            return Response(content=file['filedata'], media_type=content_type)
+        
+        # For binary files (like images), return as binary
+        return Response(content=file['filedata'], media_type=content_type)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving file {file_path} from database: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+@app.get("/webarena/db/tasks")
+async def get_webarena_task_descriptions():
+    """Get all task descriptions from the database"""
+    if not db_conn:
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Query to get unique task descriptions
+        cursor.execute("""
+            SELECT DISTINCT description, 
+                   regexp_replace(filepath, '/[^/]*$', '') as folder_path
+            FROM files 
+            WHERE description IS NOT NULL
+            AND filepath LIKE 'nnetnav_openweb_3/%'
+            ORDER BY description
+        """)
+        
+        tasks = cursor.fetchall()
+        cursor.close()
+        
+        result = {}
+        for task in tasks:
+            description = task['description']
+            folder = task['folder_path']
+            
+            if description not in result:
+                result[description] = []
+            
+            result[description].append(folder)
+        
+        return result
+    
+    except Exception as e:
+        logger.error(f"Error querying task descriptions from database: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

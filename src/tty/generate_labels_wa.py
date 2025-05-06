@@ -16,7 +16,7 @@ if not API_KEY:
 # Initialize OpenAI client
 client = OpenAI(api_key=API_KEY)
 
-MODEL_NAME = "gpt-4o-mini" # Or another suitable OpenAI model like "gpt-3.5-turbo"
+MODEL_NAME = "gpt-4o-mini" 
 WEB_ARENA_DIR = Path(".data/webarena")
 INSTANCES_DIR = WEB_ARENA_DIR / "instances"
 OUTPUT_FILE = WEB_ARENA_DIR / "instance_labels.json"

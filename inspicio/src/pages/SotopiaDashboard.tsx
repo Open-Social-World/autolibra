@@ -325,7 +325,6 @@ function SotopiaDashboard() {
                  // Map over agentIds to render a CommentSystem for each agent
                  agentIds.map((agentId, index) => (
                    <div key={agentId} className={index > 0 ? "mt-4 border-t pt-4" : ""}>
-                     {/* Optional: Add a header indicating which agent this CommentSystem is for */}
                      <h3 className="text-md font-semibold mb-2 px-4">Annotating: {agentId}</h3>
                      <CommentSystem
                        // Pass the formatted conversation string
