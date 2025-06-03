@@ -23,7 +23,7 @@ def main():
     search_paths = [
         os.path.join(os.getcwd(), "inspicio", ".data"),
         os.path.join(os.getcwd(), ".data"),
-        os.path.join(os.getcwd(), "inspicio", ".data", "extracted"),
+        os.path.join(os.getcwd(), "inspicio", ".data", "webvoyager-nnetnav-openweb-3"),
         os.path.join(os.getcwd(), "inspicio", ".data", "webarena"),
     ]
     

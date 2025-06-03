@@ -36,8 +36,8 @@ webarena_instances_path = webarena_dataset_path / "instances"
 sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
 # --- Add path for WebArena metrics ---
 webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
-# --- Add path for WebArena mock dataset ---
-webarena_mock_path = Path(__file__).parent.parent.parent / "inspicio" / ".data" / "extracted" / "nnetnav_openweb_3"
+# --- Add path for WebVoyager dataset ---
+webvoyager_path = Path(__file__).parent.parent.parent / ".data" / "nnetnav_openweb_3"
 # --- End Add paths ---
 
 # Add at the top of the file
@@ -650,9 +650,9 @@ async def get_webarena_instance_agent_metrics(instance_id: str, agent_id: str):
         raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
 # --- END NEW ENDPOINT ---
 
-@app.get("/webarena/mock/instances")
-def get_webarena_mock_instances():
-    """Get all WebArena mock instances from the database"""
+@app.get("/webvoyager/instances")
+def get_webvoyager_instances():
+    """Get all WebVoyager instances from the database"""
     if not db_conn:
         logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
@@ -667,7 +667,7 @@ def get_webarena_mock_instances():
                 regexp_replace(filepath, '/[^/]*$', '') as folder_path,
                 description
             FROM files 
-            WHERE filepath LIKE 'nnetnav_openweb_%/%'
+            WHERE filepath LIKE 'nnetnav_openweb_3/%'
             AND description IS NOT NULL
             ORDER BY folder_path
         """)
@@ -698,12 +698,12 @@ def get_webarena_mock_instances():
         return instances
         
     except Exception as e:
-        logger.error(f"Error querying WebArena mock instances: {str(e)}", exc_info=True)
+        logger.error(f"Error querying WebVoyagerinstances: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-@app.get("/webarena/mock/instances/{instance_id}")
-def get_webarena_mock_instance(instance_id: str):
-    """Get details for a specific WebArena mock instance"""
+@app.get("/webvoyager/instances/{instance_id}")
+def get_webvoyager_instance(instance_id: str):
+    """Get details for a specific WebVoyager instance"""
     if not db_conn:
         logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
@@ -737,7 +737,9 @@ def get_webarena_mock_instance(instance_id: str):
         
         files = []
         log_content = None
+        log_segments = []
         
+        # First pass to collect all files and find the log file
         for row in cursor.fetchall():
             file_data = dict(row)
             
@@ -763,17 +765,35 @@ def get_webarena_mock_instance(instance_id: str):
                         filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
                     
                     # Try the corrected path first
-                    log_path = os.path.join(webarena_mock_path.parent, filepath)
+                    log_path = os.path.join(webvoyager_path.parent, filepath)
                     
                     if not os.path.exists(log_path):
                         # Try the original path as fallback
-                        alt_log_path = os.path.join(webarena_mock_path, file_data['filepath'].lstrip('/'))
+                        alt_log_path = os.path.join(webvoyager_path, file_data['filepath'].lstrip('/'))
                         if os.path.exists(alt_log_path):
                             log_path = alt_log_path
                     
                     if os.path.exists(log_path):
                         with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
                             log_content = f.read()
+                            
+                            # Split log into segments based on actions
+                            segments = []
+                            current_segment = ""
+                            
+                            for line in log_content.splitlines():
+                                current_segment += line + "\n"
+                                
+                                # If line contains "action:" it's the end of a segment
+                                if "action:" in line:
+                                    segments.append(current_segment.strip())
+                                    current_segment = ""
+                            
+                            # Add the last segment if it's not empty
+                            if current_segment.strip():
+                                segments.append(current_segment.strip())
+                                
+                            log_segments = segments
                     else:
                         logger.error(f"Log file not found at: {log_path}")
                 except Exception as e:
@@ -791,6 +811,36 @@ def get_webarena_mock_instance(instance_id: str):
         description_row = cursor.fetchone()
         description = description_row['description'] if description_row else "Unknown Task"
         
+        # Get screenshot files and sort them
+        screenshot_files = [f for f in files if f['filetype'] in ('image/png', 'image/jpeg')]
+        screenshot_files.sort(key=lambda x: x['filepath'])
+        
+        # Match log segments to screenshots if possible
+        screenshot_log_pairs = []
+        
+        # If we have both screenshots and log segments, try to pair them
+        if screenshot_files and log_segments:
+            # If we have more screenshots than log segments, use the available segments
+            if len(screenshot_files) > len(log_segments):
+                for i, screenshot in enumerate(screenshot_files):
+                    if i < len(log_segments):
+                        screenshot_log_pairs.append({
+                            "screenshot_id": screenshot['id'],
+                            "log_segment": log_segments[i]
+                        })
+                    else:
+                        screenshot_log_pairs.append({
+                            "screenshot_id": screenshot['id'],
+                            "log_segment": "No corresponding log segment available"
+                        })
+            # If we have more log segments than screenshots, use the first segments
+            else:
+                for i, screenshot in enumerate(screenshot_files):
+                    screenshot_log_pairs.append({
+                        "screenshot_id": screenshot['id'],
+                        "log_segment": log_segments[i]
+                    })
+        
         cursor.close()
         
         return {
@@ -798,18 +848,19 @@ def get_webarena_mock_instance(instance_id: str):
             "folder_path": folder_path,
             "description": description,
             "files": files,
-            "log_content": log_content
+            "log_content": log_content,
+            "screenshot_log_pairs": screenshot_log_pairs
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error querying WebArena mock instance {instance_id}: {str(e)}", exc_info=True)
+        logger.error(f"Error querying WebVoyager instance {instance_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-@app.get("/webarena/mock/files/{file_id}")
-def get_webarena_mock_file(file_id: int):
-    """Get a specific file from the WebArena mock dataset"""
+@app.get("/webvoyager/files/{file_id}")
+def get_webvoyager_file(file_id: int):
+    """Get a specific file from the WebVoyager dataset"""
     if not db_conn:
         logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
@@ -837,11 +888,11 @@ def get_webarena_mock_file(file_id: int):
             filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
         
         # Construct the full path to the file
-        file_path = os.path.join(webarena_mock_path.parent, filepath)
+        file_path = os.path.join(webvoyager_path.parent, filepath)
         
         if not os.path.exists(file_path):
             # Try an alternative path as fallback
-            alt_file_path = os.path.join(webarena_mock_path, file_record['filepath'].lstrip('/'))
+            alt_file_path = os.path.join(webvoyager_path, file_record['filepath'].lstrip('/'))
             if not os.path.exists(alt_file_path):
                 logger.error(f"File not found on disk: {file_path} or {alt_file_path}")
                 raise HTTPException(status_code=404, detail=f"File not found on disk: {file_path}")

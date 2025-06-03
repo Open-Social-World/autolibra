@@ -28,7 +28,7 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-BASE_DIR = os.path.join(os.getcwd(), "inspicio", ".data", "extracted")
+BASE_DIR = os.path.join(os.getcwd(),".data", "webvoyager-nnetnav-openweb-3")
 
 def ensure_description_column():
     cursor.execute("""

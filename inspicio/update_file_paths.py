@@ -14,8 +14,8 @@ try:
     # This will update all file paths to use the correct location
     cursor.execute("""
         UPDATE files
-        SET filepath = REPLACE(filepath, 'extracted_data/', '.data/extracted/')
-        WHERE filepath LIKE 'extracted_data/%'
+        SET filepath = REPLACE(filepath, 'webvoyager-nnetnav-openweb-3/', '.data/webvoyager-nnetnav-openweb-3/')
+        WHERE filepath LIKE 'webvoyager-nnetnav-openweb-3/%'
     """)
     
     updated_rows = cursor.rowcount

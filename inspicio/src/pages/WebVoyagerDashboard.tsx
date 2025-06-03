@@ -6,11 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/Header"; 
 import { MessageSquare, Users, Calendar, TrendingUp, Search, ExternalLink } from 'lucide-react';
-import { LabeledButton } from "@/components/webarena_mock_ui/LabeledButton"; // Updated path
-import MetricSidebar from "@/components/webarena_mock_ui/MetricSidebar"; // Updated path
+import { LabeledButton } from "@/components/webvoyager_ui/LabeledButton"; // Updated path
+import MetricSidebar from "@/components/webvoyager_ui/MetricSidebar"; // Updated path
 import webarenaLogo from "../assets/WebArenaMascot.png"; // Assuming a webarena logo exists
 import { useNavigate } from "react-router-dom";
-import TrajectorySearchBar from "@/components/webarena_mock_ui/trajectory-searchbar"; // Updated path
+import TrajectorySearchBar from "@/components/webvoyager_ui/trajectory-searchbar"; // Updated path
 import {
   Command,
   CommandDialog,
@@ -33,6 +33,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 
 
@@ -62,9 +63,16 @@ interface InstanceDetails {
   description: string;
   files: FileData[];
   log_content: string | null;
+  screenshot_log_pairs: ScreenshotLogPair[];
 }
 
-function WebArenaMock() {
+// Add a new interface for screenshot-log pairs
+interface ScreenshotLogPair {
+  screenshot_id: number;
+  log_segment: string;
+}
+
+function WebVoyagerDashboard() {
   const [instances, setInstances] = useState<MockInstance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [instanceDetails, setInstanceDetails] = useState<InstanceDetails | null>(null);
@@ -76,17 +84,22 @@ function WebArenaMock() {
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const [currentLogSegment, setCurrentLogSegment] = useState<string>("");
+
+  // Add state for carousel API
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     async function fetchInstances() {
       try {
-        const response = await fetch("http://localhost:8000/webarena/mock/instances");
+        const response = await fetch("http://localhost:8000/webvoyager/instances");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data: MockInstance[] = await response.json();
         setInstances(data);
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching WebArena mock instances:", error);
+        console.error("Error fetching WebVoyager instances:", error);
         setLoading(false);
       }
     }
@@ -94,14 +107,41 @@ function WebArenaMock() {
     fetchInstances();
   }, []);
 
+  // Add effect to handle carousel changes
+  useEffect(() => {
+    if (!carouselApi) return;
+    
+    const handleSelect = () => {
+      const selectedIndex = carouselApi.selectedScrollSnap();
+      setCurrentIndex(selectedIndex);
+      
+      if (instanceDetails?.screenshot_log_pairs && 
+          instanceDetails.screenshot_log_pairs[selectedIndex]) {
+        setCurrentLogSegment(instanceDetails.screenshot_log_pairs[selectedIndex].log_segment);
+      } else {
+        setCurrentLogSegment("");
+      }
+    };
+    
+    carouselApi.on("select", handleSelect);
+    
+    // Call once to set initial state
+    handleSelect();
+    
+    return () => {
+      carouselApi.off("select", handleSelect);
+    };
+  }, [carouselApi, instanceDetails]);
+
   async function fetchInstanceDetails(instanceId: string) {
     setDetailsLoading(true);
     setSelectedInstance(instanceId);
     setInstanceDetails(null);
     setScreenshots([]);
+    setCurrentLogSegment("");
 
     try {
-      const response = await fetch(`http://localhost:8000/webarena/mock/instances/${instanceId}`);
+      const response = await fetch(`http://localhost:8000/webvoyager/instances/${instanceId}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data: InstanceDetails = await response.json();
       setInstanceDetails(data);
@@ -114,10 +154,16 @@ function WebArenaMock() {
       
       // Create URLs for screenshots
       const screenshotUrls = screenshotFiles.map(file => 
-        `http://localhost:8000/webarena/mock/files/${file.id}`
+        `http://localhost:8000/webvoyager/files/${file.id}`
       );
       
       setScreenshots(screenshotUrls);
+      
+      // Set the initial log segment if available
+      if (data.screenshot_log_pairs && data.screenshot_log_pairs.length > 0) {
+        setCurrentLogSegment(data.screenshot_log_pairs[0].log_segment);
+      }
+      
       setDetailsLoading(false);
     } catch (error) {
       console.error(`Error fetching instance details for ${instanceId}:`, error);
@@ -233,17 +279,22 @@ function WebArenaMock() {
             <CardContent className="flex-grow p-4 overflow-y-auto">
               {screenshots.length > 0 ? (
                 <div className="p-1 mb-4">
-                  <Carousel>
+                  <Carousel 
+                    setApi={setCarouselApi}
+                  >
                     <CarouselContent>
                       {screenshots.map((screenshot, index) => (
                         <CarouselItem key={index}>
                           <Card>
-                            <CardContent className="flex aspect-video items-center justify-center p-2">
+                            <CardContent className="flex aspect-video items-center justify-center p-2 relative">
                               <img 
                                 src={screenshot} 
                                 alt={`Screenshot ${index + 1} of ${screenshots.length}`} 
                                 className="max-h-full max-w-full object-contain"
                               />
+                              <div className="absolute bottom-3 right-3 bg-black/70 text-white px-2 py-1 rounded text-sm">
+                                {index + 1} / {screenshots.length}
+                              </div>
                             </CardContent>
                           </Card>
                         </CarouselItem>
@@ -261,6 +312,10 @@ function WebArenaMock() {
               
               {detailsLoading ? (
                 <div className="p-6 text-center text-muted-foreground">Loading experiment log...</div>
+              ) : currentLogSegment ? (
+                <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
+                  {currentLogSegment}
+                </div>
               ) : instanceDetails?.log_content ? (
                 <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
                   {instanceDetails.log_content}
@@ -313,7 +368,7 @@ function WebArenaMock() {
                           </div>
                           <div className="mt-1 flex justify-end">
                             <a 
-                              href={`http://localhost:8000/webarena/mock/files/${file.id}`} 
+                              href={`http://localhost:8000/webvoyager/files/${file.id}`} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="text-xs flex items-center gap-1 text-blue-500 hover:text-blue-700"
@@ -349,4 +404,4 @@ function WebArenaMock() {
   );
 }
 
-export default WebArenaMock;
+export default WebVoyagerDashboard;

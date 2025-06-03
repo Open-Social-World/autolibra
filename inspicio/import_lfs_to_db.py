@@ -14,7 +14,7 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 # Base directory where files were extracted
-base_dir = ".data"  # Change this if you extracted to a different location
+base_dir = ".data" 
 
 # Function to calculate file hash (SHA-256)
 def calculate_hash(file_path):
@@ -56,22 +56,19 @@ def extract_and_import():
         os.path.join(base_dir, "nnetnav_openweb_3.tar.gz")
     ]
     
-    extract_dir = os.path.join(base_dir, "extracted")
-    os.makedirs(extract_dir, exist_ok=True)
-    
     for tar_file in tar_files:
         if os.path.exists(tar_file):
             print(f"Extracting {tar_file}...")
             with tarfile.open(tar_file) as tar:
-                tar.extractall(path=extract_dir)
-    
-    # Now walk through the extracted directory and import files
-    for root, dirs, files in os.walk(extract_dir):
+                tar.extractall(path=base_dir)
+
+
+    for root, dirs, files in os.walk(base_dir):
         for file in files:
             if file.endswith(('.png', '.tar.gz', '.log')):
                 full_path = os.path.join(root, file)
                 # Calculate relative path to maintain structure
-                rel_path = os.path.relpath(full_path, extract_dir)
+                rel_path = os.path.relpath(full_path, base_dir)
                 
                 # Get file information
                 file_size = os.path.getsize(full_path)
