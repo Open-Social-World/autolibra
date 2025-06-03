@@ -1,16 +1,16 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Button } from "../components/ui/button"; 
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ScrollArea } from "../components/ui/scroll-area";   
-import { Separator } from "../components/ui/separator"; 
-import { Skeleton } from "../components/ui/skeleton";
-import { Header } from "../components/Header"; 
+import { Button } from "@/components/ui/button"; 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";   
+import { Separator } from "@/components/ui/separator"; 
+import { Skeleton } from "@/components/ui/skeleton";
+import { Header } from "@/components/Header"; 
 import { MessageSquare, Users, Calendar, TrendingUp, Search, ExternalLink } from 'lucide-react';
-import { LabeledButton } from "../components/webvoyager_ui/LabeledButton";
-import MetricSidebar from "../components/webvoyager_ui/MetricSidebar"; 
+import { LabeledButton } from "@/components/webvoyager_ui/LabeledButton";
+import MetricSidebar from "@/components/webvoyager_ui/MetricSidebar"; 
 import webvoyagerLogo from "../assets/WebVoyagerLogo.png"; 
 import { useNavigate } from "react-router-dom";
-import TrajectorySearchBar from "../components/webvoyager_ui/trajectory-searchbar";
+import TrajectorySearchBar from "@/components/webvoyager_ui/trajectory-searchbar";
 import {
   Command,
   CommandDialog,
@@ -21,12 +21,12 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from "../components/ui/command"; 
+} from "@/components/ui/command"; 
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "../components/ui/hover-card"; 
+} from "@/components/ui/hover-card"; 
 import {
   Carousel,
   CarouselContent,
@@ -34,8 +34,7 @@ import {
   CarouselNext,
   CarouselPrevious,
   type CarouselApi,
-} from "../components/ui/carousel";
-import CommentSystem from "../components/webvoyager_ui/comment-system";
+} from "@/components/ui/carousel";
 
 
 // Interface for mock instances from the database
@@ -73,50 +72,6 @@ interface ScreenshotLogPair {
   log_segment: string;
 }
 
-// Update LabeledButton props interface to match component
-interface LabeledButtonProps {
-  id: string;
-  topic: string;
-  selected?: boolean;
-  onClick: (id: string) => void;
-}
-
-// Add missing TrajectorySummary interface
-interface TrajectorySummary {
-  id: string;
-  title: string;
-  description?: string;
-  timestamp?: string;
-}
-
-// Interface for conversation entries from /trajectories/{instanceId}
-interface ConversationEntry {
-  agent_id: string;
-  timestamp: string;
-  content: string;
-}
-
-// Add timestamp formatting function
-function formatTimestamp(timestamp: string): string {
-  try {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  } catch (e) {
-    console.error("Error formatting timestamp:", timestamp, e);
-    return timestamp;
-  }
-}
-
-// Format conversation to string function
-const formatConversationToString = (conv: ConversationEntry[]): string => {
-  if (!conv || conv.length === 0) return "";
-  return conv.map(entry => {
-    const cleanContent = entry.content.replace(/^said:\s*/, '');
-    return `[${formatTimestamp(entry.timestamp)}] ${entry.agent_id}:\n${cleanContent}`;
-  }).join("\n\n---\n\n");
-};
-
 function WebVoyagerDashboard() {
   const [instances, setInstances] = useState<MockInstance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
@@ -134,9 +89,6 @@ function WebVoyagerDashboard() {
   // Add state for carousel API
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Add missing trajectoryRefs state
-  const [trajectoryRefs] = useState<{ [key: string]: React.RefObject<HTMLDivElement> }>({});
 
   useEffect(() => {
     async function fetchInstances() {
@@ -270,23 +222,20 @@ function WebVoyagerDashboard() {
         <div className="md:col-span-3">
           <Card className="h-full flex flex-col">
             <CardHeader>
-              <CardTitle>Interactions</CardTitle>
+              <CardTitle>Experiments</CardTitle>
               <div className="mt-4">
-                 <TrajectorySearchBar
-                    trajectories={instances.map(instance => ({
-                        id: instance.instance_id,
-                        title: instance.label,
-                        description: "",
-                        timestamp: ""
-                    }))}
-                    onSelectTrajectory={(trajectory: TrajectorySummary) => {
-                        fetchInstanceDetails(trajectory.id);
-                    }}
-                 />
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-left font-normal"
+                  onClick={() => setOpen(true)}
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  <span>Search experiments...</span>
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="flex-grow overflow-hidden p-2">
-              <ScrollArea className="h-[calc(100%-80px)]" ref={scrollAreaRef}>
+              <ScrollArea className="h-[calc(100vh-250px)]" ref={scrollAreaRef}>
                 {loading ? (
                   <div className="space-y-2 p-2">
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -296,16 +245,13 @@ function WebVoyagerDashboard() {
                 ) : (
                   <div className="space-y-2 p-1">
                     {instances.map((instance) => (
-                      <div ref={trajectoryRefs[instance.instance_id]} key={instance.instance_id}>
-                        <LabeledButton
-                          id={instance.instance_id}
-                          topic={instance.label}
-                          selected={selectedInstance === instance.instance_id}
-                          onClick={(id: string) => {
-                            fetchInstanceDetails(id);
-                          }}
-                        />
-                      </div>
+                      <LabeledButton
+                        key={instance.instance_id}
+                        id={instance.instance_id}
+                        topic={instance.label || instance.instance_id}
+                        isSelected={selectedInstance === instance.instance_id}
+                        onClick={handleInstanceClick}
+                      />
                     ))}
                   </div>
                 )}
@@ -317,30 +263,25 @@ function WebVoyagerDashboard() {
         <div className="md:col-span-6">
           <Card className="flex flex-col h-full">
             <CardHeader className="flex-shrink-0 border-b">
-              {selectedInstance ? (
+              {instanceDetails ? (
                 <div>
                   <Header
-                    title={
-                      selectedInstance
-                        ? instances.find(i => i.instance_id === selectedInstance)?.label || ""
-                        : "Interaction Details"
-                    }
-                    subtitle1={`Experiment ID: ${selectedInstance}`}
-                    subtitle2={`${screenshots.length} screenshots`}
-                    subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    className="mb-0"
+                    title={instanceDetails.description || instanceDetails.instance_id}
+                    subtitle1={`Experiment ID: ${instanceDetails.instance_id}`}
+                    subtitle1Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                    className="mb-0 pb-4"
                   />
                 </div>
               ) : (
-                <CardTitle>Select an interaction</CardTitle>
+                <CardTitle>Experiment Screenshots</CardTitle>
               )}
             </CardHeader>
-            <CardContent className="flex-grow p-4 flex flex-col gap-4">
-              {/* Screenshots - Full width */}
+            <CardContent className="flex-grow p-4 overflow-y-auto">
               {screenshots.length > 0 ? (
-                <div className="w-full">
-                  <Carousel setApi={setCarouselApi}>
+                <div className="p-1 mb-4">
+                  <Carousel 
+                    setApi={setCarouselApi}
+                  >
                     <CarouselContent>
                       {screenshots.map((screenshot, index) => (
                         <CarouselItem key={index}>
@@ -364,49 +305,32 @@ function WebVoyagerDashboard() {
                   </Carousel>
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground w-full">
+                <div className="p-6 text-center text-muted-foreground mb-4">
                   No screenshots available.
                 </div>
               )}
-
-              {/* Information and Comments - Side by side */}
-              <div className="flex gap-4 flex-grow">
-                {/* Left side: Log/Information */}
-                <div className="flex-1 overflow-y-auto">
-                  {currentLogSegment && (
-                    <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
-                      {currentLogSegment}
-                    </div>
-                  )}
+              
+              {detailsLoading ? (
+                <div className="p-6 text-center text-muted-foreground">Loading experiment log...</div>
+              ) : currentLogSegment ? (
+                <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
+                  {currentLogSegment}
                 </div>
-
-                {/* Right side: Comment System */}
-                <div className="w-[45%] border-l">
-                  <div className="pl-4">
-                    <h3 className="text-sm font-semibold mb-2">Agent Annotations</h3>
-                    {detailsLoading ? (
-                      <div className="text-center text-muted-foreground">Loading Interaction...</div>
-                    ) : selectedInstance && instanceDetails?.log_content ? (
-                      <CommentSystem
-                        initialText={instanceDetails.log_content}
-                        isLoading={false}
-                        instanceId={selectedInstance}
-                        agentId="agent"
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground">
-                        {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
-                      </div>
-                    )}
-                  </div>
+              ) : instanceDetails?.log_content ? (
+                <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
+                  {instanceDetails.log_content}
                 </div>
-              </div>
+              ) : (
+                <div className="p-6 text-center text-muted-foreground">
+                  {selectedInstance ? "No log available for this experiment." : "Select an experiment to view details."}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         <div className="md:col-span-3 space-y-4">
-          {selectedInstance && (
+          {instanceDetails ? (
             <Card className="h-full">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -419,7 +343,7 @@ function WebVoyagerDashboard() {
                   <div>
                     <h3 className="text-sm font-medium">Description</h3>
                     <p className="text-sm text-muted-foreground">
-                      {instanceDetails?.description || "No description available"}
+                      {instanceDetails.description || "No description available"}
                     </p>
                   </div>
                   
@@ -435,7 +359,7 @@ function WebVoyagerDashboard() {
                   <div>
                     <h3 className="text-sm font-medium mb-2">Files</h3>
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                      {instanceDetails?.files.map(file => (
+                      {instanceDetails.files.map(file => (
                         <div key={file.id} className="text-xs p-2 bg-muted rounded-md">
                           <div className="font-medium">{file.filename}</div>
                           <div className="text-muted-foreground flex justify-between">
@@ -456,6 +380,20 @@ function WebVoyagerDashboard() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Experiment Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-muted-foreground text-center p-4 h-[calc(100vh-250px)] flex items-center justify-center">
+                  Select an experiment to view details
                 </div>
               </CardContent>
             </Card>

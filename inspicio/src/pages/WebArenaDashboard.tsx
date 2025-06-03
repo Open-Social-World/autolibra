@@ -1,16 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Button } from "@/components/ui/button"; 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";   
-import { Separator } from "@/components/ui/separator"; 
-import { Skeleton } from "@/components/ui/skeleton";
-import { Header } from "@/components/Header"; 
+import { Button } from "../components/ui/button"; 
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { ScrollArea } from "../components/ui/scroll-area";   
+import { Separator } from "../components/ui/separator"; 
+import { Skeleton } from "../components/ui/skeleton";
+import { Header } from "../components/Header"; 
 import { MessageSquare, Users, Calendar, TrendingUp } from 'lucide-react';
-import { LabeledButton } from "@/components/webarena_ui/LabeledButton"; // Updated path
-import MetricSidebar from "@/components/webarena_ui/MetricSidebar"; // Updated path
+import { LabeledButton } from "../components/webarena_ui/LabeledButton"; // Updated path
+import MetricSidebar from "../components/webarena_ui/MetricSidebar"; // Updated path
 import webarenaLogo from "../assets/WebArenaMascot.png"; // Assuming a webarena logo exists
 import { useNavigate } from "react-router-dom";
-import TrajectorySearchBar from "@/components/webarena_ui/trajectory-searchbar"; // Updated path
+import TrajectorySearchBar from "../components/webarena_ui/trajectory-searchbar"; // Updated path
+import CommentSystem from "../components/webarena_ui/comment-system"; // Updated path
 import {
   Command,
   CommandDialog,
@@ -21,12 +22,12 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from "@/components/ui/command"; 
+} from "../components/ui/command"; 
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card"; 
+} from "../components/ui/hover-card"; 
 
 
 // Interface matches /webarena/trajectories output
@@ -39,8 +40,8 @@ interface Label {
 interface TrajectorySummary {
   id: string;
   title: string;
-  description: string;
-  timestamp: string;
+  description?: string;
+  timestamp?: string;
 }
 
 // Interface matches conversation entries from /trajectories/{instanceId}
@@ -55,6 +56,14 @@ interface ConversationData {
   instance_id: string;
   conversation: ConversationEntry[];
   scenario?: string; // Matches backend key
+}
+
+// Add type for LabeledButton props
+interface LabeledButtonProps {
+  id: string;
+  topic: string;
+  selected?: boolean;
+  onClick: (id: string) => void;
 }
 
 function WebArenaDashboard() {
@@ -157,47 +166,13 @@ function WebArenaDashboard() {
     return label;
   };
 
-  // Format conversation log string
+  // Function to format conversation array into a single string for CommentSystem
   const formatConversationToString = (conv: ConversationEntry[]): string => {
-    return conv
-      .map(entry => {
-        // Use keys from ConversationEntry
-        const timestampStr = formatTimestamp(entry.timestamp);
-        const agentId = entry.agent_id || 'Unknown';
-        
-        // Clean up the agent ID for display (capitalize first letter)
-        const displayAgentId = agentId.charAt(0).toUpperCase() + agentId.slice(1);
-        
-        // Clean up the content
-        let content = entry.content || '';
-        
-        // Extract description using regex pattern matching
-        const descriptionMatch = content.match(/'description':\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) || 
-                                content.match(/"description":\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
-                                content.match(/'description':\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
-                                content.match(/"description":\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) ;
-        
-        if (descriptionMatch && descriptionMatch[1]) {
-          content = descriptionMatch[1];
-        } else {
-          // If no description, try to extract text field
-          const textMatch = content.match(/'text':\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) || 
-                           content.match(/"text":\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
-                           content.match(/'text':\s*"((?:[^"\\]|\\.|"(?:\\.|[^"\\])*")*)"/) ||
-                           content.match(/"text":\s*'((?:[^'\\]|\\.|'(?:\\.|[^'\\])*')*)'/) ;
-          
-          if (textMatch && textMatch[1]) {
-            content = textMatch[1];
-          }
-        }
-        
-        // Remove any remaining escaped quotes and clean up
-        content = content.replace(/\\'/g, "'").replace(/\\"/g, '"');
-        
-        // Return the formatted entry
-        return `[${timestampStr}] ${displayAgentId}: ${content}`;
-      })
-      .join('\n\n');
+    if (!conv || conv.length === 0) return "";
+    return conv.map(entry => {
+      const cleanContent = entry.content.replace(/^said:\s*/, '');
+      return `[${formatTimestamp(entry.timestamp)}] ${entry.agent_id}:\n${cleanContent}`;
+    }).join("\n\n---\n\n"); // Separate messages clearly
   };
 
   // Filter agent IDs for metrics sidebar (only 'agent')
@@ -242,13 +217,13 @@ function WebArenaDashboard() {
               <CardTitle>Interactions</CardTitle>
               <div className="mt-4">
                  <TrajectorySearchBar
-                    trajectories={labels.map(l => ({
-                        id: l.instance_id,
-                        title: getTopicFromLabel(l.label),
+                    trajectories={labels.map(label => ({
+                        id: label.instance_id,
+                        title: getTopicFromLabel(label.label),
                         description: "",
-                        timestamp: "",
+                        timestamp: ""
                     }))}
-                    onSelectTrajectory={(trajectory) => {
+                    onSelectTrajectory={(trajectory: TrajectorySummary) => {
                         fetchConversation(trajectory.id);
                     }}
                  />
@@ -272,7 +247,7 @@ function WebArenaDashboard() {
                           <LabeledButton
                             id={item.instance_id}
                             topic={topic}
-                            isSelected={selectedInstance === item.instance_id}
+                            selected={selectedInstance === item.instance_id}
                             onClick={(id: string) => {
                               fetchConversation(id);
                             }}
@@ -289,45 +264,48 @@ function WebArenaDashboard() {
 
         <div className="md:col-span-6">
           <Card className="flex flex-col h-full">
-            <CardHeader className="flex-shrink-0 border-b">
+            <CardHeader className="flex-shrink-0">
               {selectedInstance ? (
                 <div>
                   <Header
                     title={
                       selectedInstance
-                        ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label)
+                        ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label || "")
                         : "Interaction Details"
                     }
-                    subtitle1={getConversationDate()}
-                    subtitle1Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    className="mb-0 pb-4"
+                    subtitle1={getAgentIds().join(" & ")}
+                    subtitle2={getConversationDate()}
+                    subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                    subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                    className="mb-0"
                   />
                 </div>
               ) : (
                 <CardTitle>Select an interaction</CardTitle>
               )}
               {scenario && (
-                <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm">
-                  <h3 className="font-semibold mb-1 text-foreground">Goal:</h3>
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
+                  <h3 className="font-medium mb-1">Goal:</h3>
                   <p className="text-muted-foreground whitespace-pre-wrap">{scenario}</p>
                 </div>
               )}
             </CardHeader>
             <CardContent className="flex-grow p-0 overflow-y-auto">
               {conversationLoading ? (
-                <div className="p-6 text-center text-muted-foreground">Loading Interaction...</div>
+                <div className="p-4 text-center text-muted-foreground">Loading Interaction...</div>
               ) : selectedInstance && conversation.length > 0 ? (
-                <ScrollArea className="h-full">
-                  <div className="p-4 lg:p-6">
-                    <Card className="border shadow-sm">
-                      <CardContent className="p-4 text-base whitespace-pre-wrap">
-                        {formatConversationToString(conversation)}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </ScrollArea>
+                // Only show comment system for "agent"
+                <div>
+                  <h3 className="text-md font-semibold mb-2 px-4">Annotating Agent Behavior</h3>
+                  <CommentSystem
+                    initialText={formatConversationToString(conversation)}
+                    isLoading={false}
+                    instanceId={selectedInstance}
+                    agentId="agent"
+                  />
+                </div>
               ) : (
-                <div className="p-6 text-center text-muted-foreground h-full flex items-center justify-center">
+                <div className="p-4 text-center text-muted-foreground h-full flex items-center justify-center">
                   {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
                 </div>
               )}

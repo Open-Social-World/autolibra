@@ -38,6 +38,7 @@ sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics"
 webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
 # --- Add path for WebVoyager dataset ---
 webvoyager_path = Path(__file__).parent.parent.parent / ".data" / "nnetnav_openweb_3"
+webvoyager_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webvoyager_nnetnav" / "8_metrics" / "llm_eval_results.jsonl"
 # --- End Add paths ---
 
 # Add at the top of the file
@@ -910,6 +911,66 @@ def get_webvoyager_file(file_id: int):
     except Exception as e:
         logger.error(f"Error retrieving file {file_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error retrieving file: {str(e)}")
+    
+@app.get("/webvoyager/instances/{instance_id}/metrics/{agent_id}")
+async def get_webvoyager_instance_agent_metrics(instance_id: str, agent_id: str):
+    """Get metrics for a specific WebVoyager instance (agent_id must be 'agent')."""
+    logger.info(f"Attempting to get WebVoyager metrics for instance='{instance_id}', agent='{agent_id}'")
+
+    # --- Validate requested agent_id ---
+    if agent_id != "agent":
+        logger.warning(f"Invalid agent_id '{agent_id}' requested for WebVoyager instance '{instance_id}'. Only 'agent' is supported.")
+        raise HTTPException(status_code=400, detail="Invalid agent_id for WebVoyager. Only 'agent' is supported.")
+    # --- End Validation ---
+
+    if not webvoyager_metrics_file.exists():
+        logger.warning(f"WebVoyager metrics file not found at {webvoyager_metrics_file} for instance {instance_id}, agent {agent_id}")
+        raise HTTPException(status_code=404, detail="WebVoyager metrics file not found")
+
+    try:
+        line_number = 0
+        with open(webarena_metrics_file, "r") as f:
+            for line in f:
+                line_number += 1
+                try:
+                    metric_data = json.loads(line)
+                    file_instance_id = metric_data.get("instance_id")
+                    # --- Check agent_id in file ---
+                    file_agent_id = metric_data.get("agent_id")
+                    if file_agent_id != "agent":
+                        # Silently skip lines with incorrect agent_id in the file
+                        continue
+                    # --- End Check ---
+
+                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
+                    ids_match = file_instance_id == instance_id
+                    # agents_match is implicitly true if we reach here, as both request and file agent_id must be 'agent'
+                    logger.debug(f"Line {line_number}: Instance match: {ids_match}")
+
+                    if ids_match: # Only need to check instance ID now
+                        logger.info(f"Found WebArena match on line {line_number} for instance='{instance_id}', agent='agent'")
+                        response_data = {}
+                        for key, value in metric_data.items():
+                             if isinstance(value, (int, float)) or (key.endswith("_reasoning") and isinstance(value, str)):
+                                 response_data[key] = value
+                        # Return the validated agent_id from the request
+                        response_data["instance_id"] = instance_id
+                        response_data["agent_id"] = agent_id # Should always be 'agent'
+                        return response_data
+                except json.JSONDecodeError:
+                    logger.error(f"Error parsing JSON on line {line_number} in WebArena metrics file: {line.strip()}")
+                    continue
+                except Exception as e: # Catch other potential errors per line
+                    logger.error(f"Error processing line {line_number} in WebArena metrics file: {line.strip()} - {e}")
+                    continue
+
+        # If loop finishes without finding a match for the instance_id with agent_id='agent'
+        logger.warning(f"WebArena metrics search completed. No match found for instance {instance_id} (with agent_id='agent') after checking {line_number} lines.")
+        raise HTTPException(status_code=404, detail="Metrics not found for this WebArena instance with agent_id='agent'")
+
+    except Exception as e:
+        logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
 
 if __name__ == "__main__":
     import uvicorn
