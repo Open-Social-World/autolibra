@@ -13,6 +13,21 @@ import StackingCards, {
 const cards = [
   {
     bgColor: "bg-black",
+    title: "SOTOPIA",
+    backgroundImage: "/src/assets/SotopiaMascot.png",
+  },
+  {
+    bgColor: "bg-black",
+    title: "WEBARENA",
+    backgroundImage: "/src/assets/WebArenaMascot.png",
+  },
+  {
+    bgColor: "bg-black",
+    title: "WEBVOYAGER",
+    backgroundImage: "/src/assets/WebVoyagerLogo.png",
+  },
+  {
+    bgColor: "bg-black",
     title: "BABA AI",
     backgroundImage: "/src/assets/BabaMascot.gif",
   },
@@ -26,16 +41,6 @@ const cards = [
     title: "COLLABORATIVE GYM",
     backgroundImage: "/src/assets/CoGymMascot.png",
   },
-  {
-    bgColor: "bg-black",
-    title: "SOTOPIA",
-    backgroundImage: "/src/assets/SotopiaMascot.png",
-  },
-  {
-    bgColor: "bg-black",
-    title: "WEBARENA",
-    backgroundImage: "/src/assets/WebArenaMascot.png",
-  },
 ]
 
 export default function StackingCardsDemo() {
@@ -45,6 +50,10 @@ export default function StackingCardsDemo() {
   const handleCardClick = (title: string) => {
     if (title === "SOTOPIA") {
       navigate("/sotopia")
+    } else if (title === "WEBARENA") {
+      navigate("/webarena")
+    } else if (title === "WEBVOYAGER") {
+      navigate("/webvoyager")
     }
   }
 
@@ -67,7 +76,7 @@ export default function StackingCardsDemo() {
                 className={cn(
                   bgColor,
                   "h-[80%] sm:h-[70%] flex-col sm:flex-row aspect-video px-8 py-10 flex w-11/12 rounded-3xl mx-auto relative transition-all duration-300",
-                  title === "SOTOPIA" 
+                  (title === "SOTOPIA" || title === "WEBARENA" || title === "WEBVOYAGER")
                     ? "cursor-pointer transform hover:scale-105 hover:shadow-xl hover:brightness-125" 
                     : "hover:brightness-125"
                 )}
@@ -81,7 +90,7 @@ export default function StackingCardsDemo() {
                 <div className="flex-1 flex flex-col justify-center items-center w-full h-full">
                   <h3 className="font-bold text-5xl md:text-7xl text-center h-full flex items-center justify-center">
                     {title}
-                    {title === "SOTOPIA" && (
+                    {(title === "SOTOPIA" || title === "WEBARENA" || title === "WEBVOYAGER") && (
                       <span className="ml-3 inline-block">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline-block">
                           <path d="M5 12h14"></path>
