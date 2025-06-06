@@ -28,6 +28,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "../components/ui/hover-card"; 
+import { SidebarProvider } from "../components/ui/sidebar";
+import { AppSidebar } from "../components/sidebar";
 
 
 // Interface matches /webarena/trajectories output
@@ -179,171 +181,174 @@ function WebArenaDashboard() {
   const agentIdsForMetrics = getAgentIds().filter(id => id === 'agent');
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <Header
-        logo={webarenaLogo}
-        title="WebArena Interaction Inspector"
-        subtitle1="Browse and analyze user interactions"
-        subtitle2={`${labels.length} interactions loaded`}
-        subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-        subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-      />
+    <SidebarProvider>
+      <AppSidebar />
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <Header
+          logo={webarenaLogo}
+          title="WebArena Interaction Inspector"
+          subtitle1="Browse and analyze user interactions"
+          subtitle2={`${labels.length} interactions loaded`}
+          subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+          subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+        />
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search interactions by goal, ID, tag..." />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Interactions">
-            {labels.map((label) => (
-              <CommandItem
-                key={label.instance_id}
-                value={`${label.instance_id} ${label.label}`}
-                onSelect={() => {
-                  fetchConversation(label.instance_id);
-                  setOpen(false);
-                }}
-              >
-                {getTopicFromLabel(label.label)}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
+        <CommandDialog open={open} onOpenChange={setOpen}>
+          <CommandInput placeholder="Search interactions by goal, ID, tag..." />
+          <CommandList>
+            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup heading="Interactions">
+              {labels.map((label) => (
+                <CommandItem
+                  key={label.instance_id}
+                  value={`${label.instance_id} ${label.label}`}
+                  onSelect={() => {
+                    fetchConversation(label.instance_id);
+                    setOpen(false);
+                  }}
+                >
+                  {getTopicFromLabel(label.label)}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-3">
-          <Card className="h-full flex flex-col">
-            <CardHeader>
-              <CardTitle>Interactions</CardTitle>
-              <div className="mt-4">
-                 <TrajectorySearchBar
-                    trajectories={labels.map(label => ({
-                        id: label.instance_id,
-                        title: getTopicFromLabel(label.label),
-                        description: "",
-                        timestamp: ""
-                    }))}
-                    onSelectTrajectory={(trajectory: TrajectorySummary) => {
-                        fetchConversation(trajectory.id);
-                    }}
-                 />
-              </div>
-            </CardHeader>
-            <CardContent className="flex-grow overflow-hidden p-2">
-              <ScrollArea className="h-[calc(100%-80px)]" ref={scrollAreaRef}>
-                {loading ? (
-                  <div className="space-y-2 p-2">
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2 p-1">
-                    {(searchResults.length > 0 ? searchResults : labels).map((item) => {
-                      const topic = getTopicFromLabel(item.label);
-
-                      return (
-                        <div ref={trajectoryRefs[item.instance_id]} key={item.instance_id}>
-                          <LabeledButton
-                            id={item.instance_id}
-                            topic={topic}
-                            selected={selectedInstance === item.instance_id}
-                            onClick={(id: string) => {
-                              fetchConversation(id);
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-6">
-          <Card className="flex flex-col h-full">
-            <CardHeader className="flex-shrink-0">
-              {selectedInstance ? (
-                <div>
-                  <Header
-                    title={
-                      selectedInstance
-                        ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label || "")
-                        : "Interaction Details"
-                    }
-                    subtitle1={getAgentIds().join(" & ")}
-                    subtitle2={getConversationDate()}
-                    subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    className="mb-0"
-                  />
-                </div>
-              ) : (
-                <CardTitle>Select an interaction</CardTitle>
-              )}
-              {scenario && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
-                  <h3 className="font-medium mb-1">Goal:</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{scenario}</p>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="flex-grow p-0 overflow-y-auto">
-              {conversationLoading ? (
-                <div className="p-4 text-center text-muted-foreground">Loading Interaction...</div>
-              ) : selectedInstance && conversation.length > 0 ? (
-                // Only show comment system for "agent"
-                <div>
-                  <h3 className="text-md font-semibold mb-2 px-4">Annotating Agent Behavior</h3>
-                  <CommentSystem
-                    initialText={formatConversationToString(conversation)}
-                    isLoading={false}
-                    instanceId={selectedInstance}
-                    agentId="agent"
-                  />
-                </div>
-              ) : (
-                <div className="p-4 text-center text-muted-foreground h-full flex items-center justify-center">
-                  {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-3 space-y-4">
-          {selectedInstance && agentIdsForMetrics.length > 0 ? (
-            agentIdsForMetrics.map(agentId => (
-              <MetricSidebar
-                key={agentId}
-                instanceId={selectedInstance}
-                agentId={agentId}
-              />
-            ))
-          ) : (
-            <Card className="h-full">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-3">
+            <Card className="h-full flex flex-col">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Agent Performance Metrics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-muted-foreground text-center p-4 h-[calc(100vh-200px)] flex items-center justify-center">
-                  {conversationLoading
-                    ? "Loading..."
-                    : selectedInstance
-                      ? "Metrics only available for 'agent'."
-                      : "Select an interaction to view agent metrics"}
+                <CardTitle>Interactions</CardTitle>
+                <div className="mt-4">
+                   <TrajectorySearchBar
+                      trajectories={labels.map(label => ({
+                          id: label.instance_id,
+                          title: getTopicFromLabel(label.label),
+                          description: "",
+                          timestamp: ""
+                      }))}
+                      onSelectTrajectory={(trajectory: TrajectorySummary) => {
+                          fetchConversation(trajectory.id);
+                      }}
+                   />
                 </div>
+              </CardHeader>
+              <CardContent className="flex-grow overflow-hidden p-2">
+                <ScrollArea className="h-[calc(100%-80px)]" ref={scrollAreaRef}>
+                  {loading ? (
+                    <div className="space-y-2 p-2">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <Skeleton key={i} className="h-16 w-full" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-1">
+                      {(searchResults.length > 0 ? searchResults : labels).map((item) => {
+                        const topic = getTopicFromLabel(item.label);
+
+                        return (
+                          <div ref={trajectoryRefs[item.instance_id]} key={item.instance_id}>
+                            <LabeledButton
+                              id={item.instance_id}
+                              topic={topic}
+                              selected={selectedInstance === item.instance_id}
+                              onClick={(id: string) => {
+                                fetchConversation(id);
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
               </CardContent>
             </Card>
-          )}
+          </div>
+
+          <div className="md:col-span-6">
+            <Card className="flex flex-col h-full">
+              <CardHeader className="flex-shrink-0">
+                {selectedInstance ? (
+                  <div>
+                    <Header
+                      title={
+                        selectedInstance
+                          ? getTopicFromLabel(labels.find(l => l.instance_id === selectedInstance)?.label || "")
+                          : "Interaction Details"
+                      }
+                      subtitle1={getAgentIds().join(" & ")}
+                      subtitle2={getConversationDate()}
+                      subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                      subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                      className="mb-0"
+                    />
+                  </div>
+                ) : (
+                  <CardTitle>Select an interaction</CardTitle>
+                )}
+                {scenario && (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
+                    <h3 className="font-medium mb-1">Goal:</h3>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{scenario}</p>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="flex-grow p-0 overflow-y-auto">
+                {conversationLoading ? (
+                  <div className="p-4 text-center text-muted-foreground">Loading Interaction...</div>
+                ) : selectedInstance && conversation.length > 0 ? (
+                  // Only show comment system for "agent"
+                  <div>
+                    <h3 className="text-md font-semibold mb-2 px-4">Annotating Agent Behavior</h3>
+                    <CommentSystem
+                      initialText={formatConversationToString(conversation)}
+                      isLoading={false}
+                      instanceId={selectedInstance}
+                      agentId="agent"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground h-full flex items-center justify-center">
+                    {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="md:col-span-3 space-y-4">
+            {selectedInstance && agentIdsForMetrics.length > 0 ? (
+              agentIdsForMetrics.map(agentId => (
+                <MetricSidebar
+                  key={agentId}
+                  instanceId={selectedInstance}
+                  agentId={agentId}
+                />
+              ))
+            ) : (
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Agent Performance Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-muted-foreground text-center p-4 h-[calc(100vh-200px)] flex items-center justify-center">
+                    {conversationLoading
+                      ? "Loading..."
+                      : selectedInstance
+                        ? "Metrics only available for 'agent'."
+                        : "Select an interaction to view agent metrics"}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 

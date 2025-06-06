@@ -36,6 +36,8 @@ import {
   type CarouselApi,
 } from "../components/ui/carousel";
 import CommentSystem from "../components/webvoyager_ui/comment-system";
+import { SidebarProvider } from "../components/ui/sidebar";
+import { AppSidebar } from "../components/sidebar";
 
 
 // Interface for mock instances from the database
@@ -235,234 +237,237 @@ function WebVoyagerDashboard() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <Header
-        logo={webvoyagerLogo}
-        title="WebVoyager Interaction Inspector"
-        subtitle1="Browse and analyze user interactions"
-        subtitle2={`${instances.length} experiments loaded`}
-        subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-        subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-      />
+    <SidebarProvider>
+      <AppSidebar />
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <Header
+          logo={webvoyagerLogo}
+          title="WebVoyager Interaction Inspector"
+          subtitle1="Browse and analyze user interactions"
+          subtitle2={`${instances.length} experiments loaded`}
+          subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+          subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+        />
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search experiments by description..." />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Experiments">
-            {instances.map((instance) => (
-              <CommandItem
-                key={instance.instance_id}
-                value={`${instance.instance_id} ${instance.label}`}
-                onSelect={() => {
-                  fetchInstanceDetails(instance.instance_id);
-                  setOpen(false);
-                }}
-              >
-                {instance.label || instance.instance_id}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
+        <CommandDialog open={open} onOpenChange={setOpen}>
+          <CommandInput placeholder="Search experiments by description..." />
+          <CommandList>
+            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup heading="Experiments">
+              {instances.map((instance) => (
+                <CommandItem
+                  key={instance.instance_id}
+                  value={`${instance.instance_id} ${instance.label}`}
+                  onSelect={() => {
+                    fetchInstanceDetails(instance.instance_id);
+                    setOpen(false);
+                  }}
+                >
+                  {instance.label || instance.instance_id}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-3">
-          <Card className="h-full flex flex-col">
-            <CardHeader>
-              <CardTitle>Interactions</CardTitle>
-              <div className="mt-4">
-                 <TrajectorySearchBar
-                    trajectories={instances.map(instance => ({
-                        id: instance.instance_id,
-                        title: instance.label,
-                        description: "",
-                        timestamp: ""
-                    }))}
-                    onSelectTrajectory={(trajectory: TrajectorySummary) => {
-                        fetchInstanceDetails(trajectory.id);
-                    }}
-                 />
-              </div>
-            </CardHeader>
-            <CardContent className="flex-grow overflow-hidden p-2">
-              <ScrollArea className="h-[calc(100%-80px)]" ref={scrollAreaRef}>
-                {loading ? (
-                  <div className="space-y-2 p-2">
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2 p-1">
-                    {instances.map((instance) => (
-                      <div ref={trajectoryRefs[instance.instance_id]} key={instance.instance_id}>
-                        <LabeledButton
-                          id={instance.instance_id}
-                          topic={instance.label}
-                          selected={selectedInstance === instance.instance_id}
-                          onClick={(id: string) => {
-                            fetchInstanceDetails(id);
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-6">
-          <Card className="flex flex-col h-full">
-            <CardHeader className="flex-shrink-0 border-b">
-              {selectedInstance ? (
-                <div>
-                  <Header
-                    title={
-                      selectedInstance
-                        ? instances.find(i => i.instance_id === selectedInstance)?.label || ""
-                        : "Interaction Details"
-                    }
-                    subtitle1={`Experiment ID: ${selectedInstance}`}
-                    subtitle2={`${screenshots.length} screenshots`}
-                    subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
-                    className="mb-0"
-                  />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-3">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle>Interactions</CardTitle>
+                <div className="mt-4">
+                   <TrajectorySearchBar
+                      trajectories={instances.map(instance => ({
+                          id: instance.instance_id,
+                          title: instance.label,
+                          description: "",
+                          timestamp: ""
+                      }))}
+                      onSelectTrajectory={(trajectory: TrajectorySummary) => {
+                          fetchInstanceDetails(trajectory.id);
+                      }}
+                   />
                 </div>
-              ) : (
-                <CardTitle>Select an interaction</CardTitle>
-              )}
-            </CardHeader>
-            <CardContent className="flex-grow p-4 flex flex-col gap-4">
-              {/* Screenshots - Full width */}
-              {screenshots.length > 0 ? (
-                <div className="w-full">
-                  <Carousel setApi={setCarouselApi}>
-                    <CarouselContent>
-                      {screenshots.map((screenshot, index) => (
-                        <CarouselItem key={index}>
-                          <Card>
-                            <CardContent className="flex aspect-video items-center justify-center p-2 relative">
-                              <img 
-                                src={screenshot} 
-                                alt={`Screenshot ${index + 1} of ${screenshots.length}`} 
-                                className="max-h-full max-w-full object-contain"
-                              />
-                              <div className="absolute bottom-3 right-3 bg-black/70 text-white px-2 py-1 rounded text-sm">
-                                {index + 1} / {screenshots.length}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </CarouselItem>
+              </CardHeader>
+              <CardContent className="flex-grow overflow-hidden p-2">
+                <ScrollArea className="h-[calc(100%-80px)]" ref={scrollAreaRef}>
+                  {loading ? (
+                    <div className="space-y-2 p-2">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <Skeleton key={i} className="h-16 w-full" />
                       ))}
-                    </CarouselContent>
-                    <CarouselPrevious />
-                    <CarouselNext />
-                  </Carousel>
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground w-full">
-                  No screenshots available.
-                </div>
-              )}
-
-              {/* Information and Comments - Side by side */}
-              <div className="flex gap-4 flex-grow">
-                {/* Left side: Log/Information */}
-                <div className="flex-1 overflow-y-auto">
-                  {currentLogSegment && (
-                    <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
-                      {currentLogSegment}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-1">
+                      {instances.map((instance) => (
+                        <div ref={trajectoryRefs[instance.instance_id]} key={instance.instance_id}>
+                          <LabeledButton
+                            id={instance.instance_id}
+                            topic={instance.label}
+                            selected={selectedInstance === instance.instance_id}
+                            onClick={(id: string) => {
+                              fetchInstanceDetails(id);
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
 
-                {/* Right side: Comment System */}
-                <div className="w-[45%] border-l">
-                  <div className="pl-4">
-                    <h3 className="text-sm font-semibold mb-2">Agent Annotations</h3>
-                    {detailsLoading ? (
-                      <div className="text-center text-muted-foreground">Loading Interaction...</div>
-                    ) : selectedInstance && instanceDetails?.log_content ? (
-                      <CommentSystem
-                        initialText={instanceDetails.log_content}
-                        isLoading={false}
-                        instanceId={selectedInstance}
-                        agentId="agent"
-                      />
-                    ) : (
-                      <div className="text-center text-muted-foreground">
-                        {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
+          <div className="md:col-span-6">
+            <Card className="flex flex-col h-full">
+              <CardHeader className="flex-shrink-0 border-b">
+                {selectedInstance ? (
+                  <div>
+                    <Header
+                      title={
+                        selectedInstance
+                          ? instances.find(i => i.instance_id === selectedInstance)?.label || ""
+                          : "Interaction Details"
+                      }
+                      subtitle1={`Experiment ID: ${selectedInstance}`}
+                      subtitle2={`${screenshots.length} screenshots`}
+                      subtitle1Icon={<Users className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                      subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
+                      className="mb-0"
+                    />
+                  </div>
+                ) : (
+                  <CardTitle>Select an interaction</CardTitle>
+                )}
+              </CardHeader>
+              <CardContent className="flex-grow p-4 flex flex-col gap-4">
+                {/* Screenshots - Full width */}
+                {screenshots.length > 0 ? (
+                  <div className="w-full">
+                    <Carousel setApi={setCarouselApi}>
+                      <CarouselContent>
+                        {screenshots.map((screenshot, index) => (
+                          <CarouselItem key={index}>
+                            <Card>
+                              <CardContent className="flex aspect-video items-center justify-center p-2 relative">
+                                <img 
+                                  src={screenshot} 
+                                  alt={`Screenshot ${index + 1} of ${screenshots.length}`} 
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                                <div className="absolute bottom-3 right-3 bg-black/70 text-white px-2 py-1 rounded text-sm">
+                                  {index + 1} / {screenshots.length}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      <CarouselPrevious />
+                      <CarouselNext />
+                    </Carousel>
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground w-full">
+                    No screenshots available.
+                  </div>
+                )}
+
+                {/* Information and Comments - Side by side */}
+                <div className="flex gap-4 flex-grow">
+                  {/* Left side: Log/Information */}
+                  <div className="flex-1 overflow-y-auto">
+                    {currentLogSegment && (
+                      <div className="p-4 bg-muted/50 rounded-lg text-sm whitespace-pre-wrap font-mono">
+                        {currentLogSegment}
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        <div className="md:col-span-3 space-y-4">
-          {selectedInstance && (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Experiment Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium">Description</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {instanceDetails?.description || "No description available"}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium">Screenshots</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {screenshots.length} available
-                    </p>
-                  </div>
-                  
-                  <Separator className="my-4" />
-                  
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Files</h3>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                      {instanceDetails?.files.map(file => (
-                        <div key={file.id} className="text-xs p-2 bg-muted rounded-md">
-                          <div className="font-medium">{file.filename}</div>
-                          <div className="text-muted-foreground flex justify-between">
-                            <span>{file.filetype.split('/')[1]}</span>
-                            <span>{formatFileSize(file.filesize)}</span>
-                          </div>
-                          <div className="mt-1 flex justify-end">
-                            <a 
-                              href={`http://localhost:8000/webvoyager/files/${file.id}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs flex items-center gap-1 text-blue-500 hover:text-blue-700"
-                            >
-                              View <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
+                  {/* Right side: Comment System */}
+                  <div className="w-[45%] border-l">
+                    <div className="pl-4">
+                      <h3 className="text-sm font-semibold mb-2">Agent Annotations</h3>
+                      {detailsLoading ? (
+                        <div className="text-center text-muted-foreground">Loading Interaction...</div>
+                      ) : selectedInstance && instanceDetails?.log_content ? (
+                        <CommentSystem
+                          initialText={instanceDetails.log_content}
+                          isLoading={false}
+                          instanceId={selectedInstance}
+                          agentId="agent"
+                        />
+                      ) : (
+                        <div className="text-center text-muted-foreground">
+                          {selectedInstance ? "No interaction data found." : "Select an interaction to view details."}
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          )}
+          </div>
+
+          <div className="md:col-span-3 space-y-4">
+            {selectedInstance && (
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Experiment Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium">Description</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {instanceDetails?.description || "No description available"}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-sm font-medium">Screenshots</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {screenshots.length} available
+                      </p>
+                    </div>
+                    
+                    <Separator className="my-4" />
+                    
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Files</h3>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                        {instanceDetails?.files.map(file => (
+                          <div key={file.id} className="text-xs p-2 bg-muted rounded-md">
+                            <div className="font-medium">{file.filename}</div>
+                            <div className="text-muted-foreground flex justify-between">
+                              <span>{file.filetype.split('/')[1]}</span>
+                              <span>{formatFileSize(file.filesize)}</span>
+                            </div>
+                            <div className="mt-1 flex justify-end">
+                              <a 
+                                href={`http://localhost:8000/webvoyager/files/${file.id}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs flex items-center gap-1 text-blue-500 hover:text-blue-700"
+                              >
+                                View <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 

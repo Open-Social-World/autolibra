@@ -1,21 +1,22 @@
 import React from 'react';
-import { Button } from "@/components/ui/button"; // Use button from webarena_ui
-import { Users, Calendar } from 'lucide-react'; // Keep icons
-import { cn } from '@/lib/utils'; // Keep utility
+import { Button } from "../../components/ui/button";
+import { Users, Calendar } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface LabeledButtonProps {
   id: string;
   topic: string; 
   agents?: string; 
   date?: string;  
+  selected?: boolean;
   onClick: (id: string) => void;
 }
 
-export function LabeledButton({ id, topic, agents, date, isSelected, onClick }: LabeledButtonProps) {
+export function LabeledButton({ id, topic, agents, date, selected, onClick }: LabeledButtonProps) {
   return (
     <div className="w-full">
       <Button
-        variant={isSelected ? "default" : "outline"}
+        variant={selected ? "default" : "outline"}
         className={cn(
           "w-full justify-start text-left font-normal h-auto py-3 px-4",
           "hover:bg-accent hover:text-accent-foreground", 
