@@ -57,10 +57,11 @@ class AnnotationPayload(BaseModel):
 
 # Database connection parameters
 DB_CONFIG = {
-    "dbname": "inspiciodb",
-    "user": "postgres",
-    "password": "Yankayee123",
-    "host": "localhost"
+    "dbname": os.getenv("DB_NAME", "inspiciodb"),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "Yankayee123"),
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432")
 }
 
 # Function to get database connection
@@ -178,7 +179,12 @@ app = FastAPI(title="Conversation Dataset API", lifespan=lifespan)
 # Make sure your frontend URL is allowed, or use "*" for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Adjust as needed
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://127.0.0.1:5173",
+        "https://*.railway.app",  # Allow Railway domains
+        "*"  # Allow all origins for development - remove in production
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
