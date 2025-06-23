@@ -75,9 +75,14 @@ function SotopiaDashboard() {
     // Fetch labels when component mounts
     async function fetchLabels() {
       try {
-        const response = await fetch("http://localhost:8000/trajectories");
+        const response = await fetch("http://localhost:8000/sotopia/instances");
         const data = await response.json();
-        setLabels(data);
+        // Transform the data to match the expected Label interface
+        const transformedData = data.map((instance: any) => ({
+          instance_id: instance.instance_id,
+          label: instance.label
+        }));
+        setLabels(transformedData);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching labels:", error);
@@ -95,7 +100,7 @@ function SotopiaDashboard() {
     setConversation([]); // Clear previous conversation
 
     try {
-      const response = await fetch(`http://localhost:8000/trajectories/${instanceId}`);
+      const response = await fetch(`http://localhost:8000/sotopia/instances/${instanceId}/conversation`);
       const data: ConversationData = await response.json();
       setConversation(data.conversation || []); // Ensure conversation is set
 

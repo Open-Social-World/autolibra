@@ -15,25 +15,21 @@ from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 import psycopg2
 import psycopg2.extras  # For better handling of query results
+import uvicorn
 
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
-from osw_data.metrics import MetricSet
-# Import AnnotationSystem
 from osw_data.annotation import AnnotationSystem, AnnotationSpan
 
 # TEMPORARY Add the package directory to the Python path
 sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
-# TEMPORARY Initialize dataset path
-dataset_path = Path(__file__).parent.parent.parent / ".data" / "sotopia"
 # Define annotation path
 annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations" / "sotopia"
 # --- Add path for WebArena data ---
 webarena_dataset_path = Path(__file__).parent.parent.parent / ".data" / "webarena"
 # --- Add path for WebArena instances (still useful for direct access if needed, but not for listing via dataset) ---
 webarena_instances_path = webarena_dataset_path / "instances"
-# --- Add path for Sotopia metrics ---
-sotopia_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "sotopia" / "8_metrics" / "llm_eval_results.jsonl"
+
 # --- Add path for WebArena metrics ---
 webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
 # --- Add path for WebVoyager dataset ---
@@ -57,7 +53,7 @@ class AnnotationPayload(BaseModel):
 
 # Database connection parameters
 DB_CONFIG = {
-    "dbname": os.getenv("DB_NAME", "inspiciodb"),
+    "dbname": os.getenv("DB_NAME", "autolibra"),
     "user": os.getenv("DB_USER", "postgres"),
     "password": os.getenv("DB_PASSWORD", "Yankayee123"),
     "host": os.getenv("DB_HOST", "localhost"),
@@ -86,58 +82,6 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize database connection: {e}", exc_info=True)
         db_conn = None
     
-    # Initialize Sotopia dataset
-    dataset = MultiAgentDataset(name="sotopia", base_path=dataset_path)
-    
-    # Initialize WebArena dataset
-    try:
-        webarena_dataset = MultiAgentDataset(name="webarena", base_path=webarena_dataset_path)
-        logger.info(f"WebArena dataset initialized from {webarena_dataset_path}")
-    except Exception as e:
-        logger.error(f"Failed to initialize WebArena dataset: {e}", exc_info=True)
-        webarena_dataset = None # Set to None if initialization fails
-
-    # Load Sotopia labels
-    sotopia_labels_path = dataset_path / "instance_labels.json"
-    if sotopia_labels_path.exists():
-        try:
-            with open(sotopia_labels_path, "r") as f:
-                instance_labels = json.load(f)
-            logger.info(f"Sotopia labels loaded from {sotopia_labels_path}")
-        except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from {sotopia_labels_path}. Initializing as empty.")
-            instance_labels = {}
-        except Exception as e:
-            logger.error(f"Error loading Sotopia labels from {sotopia_labels_path}: {e}. Initializing as empty.")
-            instance_labels = {}
-    else:
-        logger.warning(f"Sotopia labels file not found at {sotopia_labels_path}")
-        instance_labels = {} # Initialize as empty dict if not found
-    
-    # Load WebArena labels
-    webarena_labels_path = webarena_dataset_path / "instance_labels.json"
-    if webarena_labels_path.exists():
-        try:
-            with open(webarena_labels_path, "r") as f:
-                webarena_instance_labels = json.load(f)
-            logger.info(f"WebArena labels loaded from {webarena_labels_path}")
-        except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from {webarena_labels_path}. Initializing as empty.")
-            webarena_instance_labels = {}
-        except Exception as e:
-            logger.error(f"Error loading WebArena labels from {webarena_labels_path}: {e}. Initializing as empty.")
-            webarena_instance_labels = {}
-    else:
-        logger.warning(f"WebArena labels file not found at {webarena_labels_path}")
-        webarena_instance_labels = {} # Initialize as empty dict if not found
-
-    # Try to load metrics
-    try:
-        metric_set = MetricSet(name="sotopia", base_path=dataset_path, induced_from="sotopia")
-    except Exception as e:
-        logger.warning(f"Could not load metrics: {str(e)}")
-        metric_set = None
-
     # Initialize Annotation System
     try:
         # Ensure the annotation directory exists
@@ -195,268 +139,6 @@ app.add_middleware(
 def read_root():
     return {"message": "Trajectory Dataset API is running"}
 
-@app.get("/trajectories")
-def get_label():
-    """Get all Sotopia instance IDs with their labels"""
-    if not dataset:
-        raise HTTPException(status_code=500, detail="Dataset not initialized")
-
-    instances = dataset.list_instances()
-    result = []
-
-    for instance_id in instances:
-        try:
-            # Get label if available from Sotopia labels
-            label = instance_labels.get(instance_id, "Unlabeled")
-
-            result.append({
-                "instance_id": instance_id,
-                "label": label
-            })
-        except Exception as e:
-            # Log specific error for Sotopia instance loading
-            logger.error(f"Error processing Sotopia instance {instance_id}: {str(e)}")
-
-    return result
-
-# --- UPDATED ENDPOINT for WebArena Instances ---
-@app.get("/webarena/trajectories")
-def get_webarena_label():
-    """Get all WebArena instance IDs with their labels"""
-    # Use the WebArena dataset object to list instances
-    global webarena_dataset # Ensure access to the global dataset object
-    if not webarena_dataset:
-        logger.error("WebArena dataset not initialized.")
-        raise HTTPException(status_code=500, detail="WebArena dataset not initialized")
-
-    try:
-        instances = webarena_dataset.list_instances()
-        # Sort numerically if possible, otherwise alphabetically (MultiAgentDataset might already sort)
-        try:
-            instances.sort(key=int)
-        except ValueError:
-            instances.sort() # Fallback sort
-    except Exception as e:
-        logger.error(f"Error listing WebArena instances using dataset object: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to list WebArena instances")
-
-    result = []
-
-    if not instances:
-        logger.info("No WebArena instances found by dataset object.")
-        return []
-
-    # Check if webarena_instance_labels were loaded
-    if 'webarena_instance_labels' not in globals():
-         logger.warning("WebArena instance labels dictionary not found in global scope.")
-         # Consider how critical labels are - maybe proceed without them or raise error
-
-    for instance_id in instances:
-        try:
-            # Get label if available from WebArena labels
-            label = globals().get('webarena_instance_labels', {}).get(instance_id, "Unlabeled")
-
-            result.append({
-                "instance_id": instance_id,
-                "label": label
-            })
-        except Exception as e:
-            # Log specific error for WebArena instance processing
-            logger.error(f"Error processing WebArena instance {instance_id} data: {str(e)}")
-            # Optionally skip this instance or add a placeholder
-
-    return result
-# --- END UPDATED ENDPOINT ---
-
-@app.get("/metrics/instances")
-def get_metrics_by_instance():
-    """Get a mapping of instance IDs to their available metrics"""
-    metrics_file = sotopia_metrics_file
-    
-    if not metrics_file.exists():
-        logger.warning(f"Sotopia metrics file not found at {metrics_file}")
-        return {}
-    
-    # Create a mapping of instance_id -> agent_id -> metrics
-    instance_metrics = {}
-    
-    try:
-        with open(metrics_file, "r") as f:
-            for line in f:
-                try:
-                    metric_data = json.loads(line)
-                    instance_id = metric_data.get("instance_id")
-                    agent_id = metric_data.get("agent_id")
-                    
-                    if not instance_id or not agent_id:
-                        continue
-                    
-                    # Initialize the instance entry if it doesn't exist
-                    if instance_id not in instance_metrics:
-                        instance_metrics[instance_id] = {}
-                    
-                    # Initialize the agent entry if it doesn't exist
-                    if agent_id not in instance_metrics[instance_id]:
-                        instance_metrics[instance_id][agent_id] = {
-                            "metrics": {},
-                            "reasoning": {}
-                        }
-                    
-                    # Extract metric scores and reasoning
-                    for key, value in metric_data.items():
-                        if isinstance(value, int) and key not in ["instance_id", "agent_id"]:
-                            instance_metrics[instance_id][agent_id]["metrics"][key] = value
-                        elif key.endswith("_reasoning") and isinstance(value, str):
-                            metric_name = key.replace("_reasoning", "")
-                            instance_metrics[instance_id][agent_id]["reasoning"][metric_name] = value
-                            
-                except json.JSONDecodeError:
-                    logger.error(f"Error parsing JSON from metrics file")
-                    continue
-    except Exception as e:
-        logger.error(f"Error reading metrics file: {str(e)}")
-        return {}
-    
-    return instance_metrics
-
-@app.get("/api/instances/{instance_id}/metrics/{agent_id}")
-async def get_instance_agent_metrics(instance_id: str, agent_id: str):
-    """Get metrics for a specific agent within a specific instance."""
-    logger.info(f"Attempting to get Sotopia metrics for instance='{instance_id}', agent='{agent_id}'")
-    metrics_file = sotopia_metrics_file
-
-    if not metrics_file.exists():
-        logger.warning(f"Sotopia metrics file not found at {metrics_file} for instance {instance_id}, agent {agent_id}")
-        raise HTTPException(status_code=404, detail="Metrics file not found")
-
-    try:
-        line_number = 0
-        with open(metrics_file, "r") as f:
-            for line in f:
-                line_number += 1
-                try:
-                    metric_data = json.loads(line)
-                    file_instance_id = metric_data.get("instance_id")
-                    file_agent_id = metric_data.get("agent_id")
-
-                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}', agent='{agent_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
-                    ids_match = file_instance_id == instance_id
-                    agents_match = file_agent_id == agent_id
-                    logger.debug(f"Line {line_number}: Instance match: {ids_match}, Agent match: {agents_match}")
-
-                    if ids_match and agents_match:
-                        logger.info(f"Found match on line {line_number} for instance='{instance_id}', agent='{agent_id}'")
-                        response_data = {}
-                        for key, value in metric_data.items():
-                             if isinstance(value, int) or (key.endswith("_reasoning") and isinstance(value, str)):
-                                 response_data[key] = value
-                        response_data["instance_id"] = instance_id
-                        response_data["agent_id"] = agent_id
-                        return response_data
-                except json.JSONDecodeError:
-                    logger.error(f"Error parsing JSON on line {line_number} in metrics file: {line.strip()}")
-                    continue
-
-        logger.warning(f"Metrics search completed. No match found for instance {instance_id}, agent {agent_id} after checking {line_number} lines.")
-        raise HTTPException(status_code=404, detail="Metrics not found for this instance/agent combination")
-
-    except Exception as e:
-        logger.error(f"Error reading metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error reading metrics")
-
-@app.get("/trajectories/{instance_id}")
-def get_trajectory(instance_id: str):
-    """Get full trajectory data for a specific instance"""
-    if not dataset:
-        raise HTTPException(status_code=500, detail="Dataset not initialized")
-    
-    try:
-        metadata = dataset.get_instance_metadata(instance_id)
-        
-        # Extract scenario from metadata
-        scenario = ""
-        if metadata and hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
-            scenario = metadata.metadata.get("scenario", "")
-            
-            # Clean the scenario text
-            if scenario:
-                # Remove HTML tags
-                scenario = re.sub(r'<.*?>', '', scenario)
-                
-                # Remove any text after a period followed by a space if it contains HTML-like content
-                match = re.search(r'\.\s+.*?<', scenario)
-                if match:
-                    scenario = scenario[:match.start() + 1]
-                
-                # Trim whitespace
-                scenario = scenario.strip()
-        
-        # Extract metrics and agent backgrounds in a single pass
-        metrics = {}
-        agent_backgrounds = {}
-        
-        if metadata:
-            # Extract agent backgrounds from agent parameters
-            if hasattr(metadata, "agents") and metadata.agents:
-                for agent_id, agent_data in metadata.agents.items():
-                    if hasattr(agent_data, "parameters") and isinstance(agent_data.parameters, dict):
-                        if "background" in agent_data.parameters:
-                            agent_backgrounds[agent_id] = agent_data.parameters["background"]
-        
-        
-        # Get trajectory data
-        conversation = []
-        
-        for agent_id in metadata.agents:
-            trajectory = dataset.get_trajectory(instance_id, agent_id)
-            
-            # Sort trajectory points by timestamp
-            trajectory_points = [
-                (point, trajectory.get_data_at(idx))
-                for idx, point in enumerate(trajectory.points)
-            ]
-            trajectory_points.sort(key=lambda x: x[0].timestamp)
-            
-            # Extract actions (which contain dialogue)
-            for point, data in trajectory_points:
-                if point.point_type == PointType.ACTION:
-                    # Extract the dialogue from the action
-                    content = None
-                    
-                    if isinstance(data, dict) and "content" in data:
-                        content = data.get("content", "")
-                    elif isinstance(data, str):
-                        content = data
-                    else:
-                        # Try to convert to string if it's not a dict or string
-                        try:
-                            content = str(data)
-                        except:
-                            continue
-                    
-                    if content:
-                        # Clean up content if needed
-                        if isinstance(content, str):
-                            # Remove escaped characters
-                            content = content.replace("\\n", "\n").replace('\\"', '"')
-                        
-                        conversation.append({
-                            "agent_id": agent_id,
-                            "timestamp": point.timestamp.isoformat(),
-                            "content": content
-                        })
-        
-        # Sort all conversation entries by timestamp
-        conversation.sort(key=lambda x: x["timestamp"])
-        
-        return {
-            "instance_id": instance_id,
-            "conversation": conversation,
-            "scenario": scenario,
-            "agent_backgrounds": agent_backgrounds
-        }
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Instance not found: {str(e)}")
 
 # --- NEW ANNOTATION ENDPOINT ---
 @app.post("/annotations")
@@ -513,149 +195,376 @@ async def create_annotation(payload: AnnotationPayload):
         raise HTTPException(status_code=500, detail=f"Failed to save annotation: {str(e)}")
 # --- END NEW ANNOTATION ENDPOINT ---
 
-@app.get("/webarena/trajectories/{instance_id}")
-def get_webarena_trajectory(instance_id: str):
-    """Get full trajectory data for a specific WebArena instance"""
-    if not webarena_dataset:
-        raise HTTPException(status_code=500, detail="WebArena dataset not initialized")
+# --- NEW DATABASE-BACKED WEBARENA ENDPOINTS ---
+
+@app.get("/webarena/instances")
+def get_webarena_instances():
+    """Get all WebArena instances from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
-        metadata = webarena_dataset.get_instance_metadata(instance_id)
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Extract scenario from metadata
-        scenario = ""
-        if metadata and hasattr(metadata, "metadata") and isinstance(metadata.metadata, dict):
-            scenario = metadata.metadata.get("scenario", "")
+        cursor.execute("""
+            SELECT instance_id, timestamp, scenario, source_model, label, metadata, created_at
+            FROM webarena_instances 
+            ORDER BY timestamp DESC
+        """)
+        
+        results = cursor.fetchall()
+        instances = []
+        
+        for row in results:
+            instance_data = dict(row)
             
-            # Clean the scenario text
-            if scenario:
-                # Remove HTML tags
-                scenario = re.sub(r'<.*?>', '', scenario)
-                
-                # Remove any text after a period followed by a space if it contains HTML-like content
-                match = re.search(r'\.\s+.*?<', scenario)
-                if match:
-                    scenario = scenario[:match.start() + 1]
-                
-                # Trim whitespace
-                scenario = scenario.strip()
+            # Convert datetime to string for JSON serialization
+            if instance_data['timestamp']:
+                instance_data['timestamp'] = instance_data['timestamp'].isoformat()
+            if instance_data['created_at']:
+                instance_data['created_at'] = instance_data['created_at'].isoformat()
+            
+            # Parse JSONB fields
+            if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
+                try:
+                    instance_data['metadata'] = json.loads(instance_data['metadata'])
+                except:
+                    pass
+            
+            instances.append(instance_data)
         
-        # Get trajectory data
+        cursor.close()
+        return instances
+        
+    except Exception as e:
+        logger.error(f"Error querying WebArena instances: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webarena/instances/{instance_id}")
+def get_webarena_instance(instance_id: str):
+    """Get details for a specific WebArena instance"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get instance data
+        cursor.execute("""
+            SELECT instance_id, timestamp, scenario, source_model, label, metadata, created_at
+            FROM webarena_instances 
+            WHERE instance_id = %s
+        """, (instance_id,))
+        
+        instance_row = cursor.fetchone()
+        if not instance_row:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
+        
+        instance_data = dict(instance_row)
+        
+        # Convert datetime to string for JSON serialization
+        if instance_data['timestamp']:
+            instance_data['timestamp'] = instance_data['timestamp'].isoformat()
+        if instance_data['created_at']:
+            instance_data['created_at'] = instance_data['created_at'].isoformat()
+        
+        # Parse JSONB fields
+        if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
+            try:
+                instance_data['metadata'] = json.loads(instance_data['metadata'])
+            except:
+                pass
+        
+        # Get agents for this instance
+        cursor.execute("""
+            SELECT agent_id, agent_type, capabilities, parameters, additional_info
+            FROM webarena_agents 
+            WHERE instance_id = %s
+            ORDER BY agent_id
+        """, (instance_id,))
+        
+        agents = []
+        for agent_row in cursor.fetchall():
+            agent_data = dict(agent_row)
+            
+            # Parse JSONB fields
+            if agent_data['capabilities'] and isinstance(agent_data['capabilities'], str):
+                try:
+                    agent_data['capabilities'] = json.loads(agent_data['capabilities'])
+                except:
+                    pass
+            
+            if agent_data['parameters'] and isinstance(agent_data['parameters'], str):
+                try:
+                    agent_data['parameters'] = json.loads(agent_data['parameters'])
+                except:
+                    pass
+            
+            if agent_data['additional_info'] and isinstance(agent_data['additional_info'], str):
+                try:
+                    agent_data['additional_info'] = json.loads(agent_data['additional_info'])
+                except:
+                    pass
+            
+            agents.append(agent_data)
+        
+        instance_data['agents'] = agents
+        cursor.close()
+        
+        return instance_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying WebArena instance {instance_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webarena/instances/{instance_id}/trajectory/{agent_id}")
+def get_webarena_trajectory_db(instance_id: str, agent_id: str):
+    """Get trajectory data for a specific agent in a WebArena instance from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get trajectory points
+        cursor.execute("""
+            SELECT timestamp, point_type, media_type, data_content, data_text, metadata, point_index
+            FROM webarena_trajectory_points 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY timestamp, point_index
+        """, (instance_id, agent_id))
+        
+        trajectory_points = []
+        for row in cursor.fetchall():
+            point_data = dict(row)
+            
+            # Convert datetime to string for JSON serialization
+            if point_data['timestamp']:
+                point_data['timestamp'] = point_data['timestamp'].isoformat()
+            
+            # Parse JSONB fields
+            if point_data['data_content'] and isinstance(point_data['data_content'], str):
+                try:
+                    point_data['data_content'] = json.loads(point_data['data_content'])
+                except:
+                    pass
+            
+            if point_data['metadata'] and isinstance(point_data['metadata'], str):
+                try:
+                    point_data['metadata'] = json.loads(point_data['metadata'])
+                except:
+                    pass
+            
+            trajectory_points.append(point_data)
+        
+        cursor.close()
+        
+        return {
+            "instance_id": instance_id,
+            "agent_id": agent_id,
+            "trajectory_points": trajectory_points
+        }
+        
+    except Exception as e:
+        logger.error(f"Error querying WebArena trajectory for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webarena/instances/{instance_id}/conversation")
+def get_webarena_conversation(instance_id: str):
+    """Get conversation data for a WebArena instance from the database (similar to the original /webarena/trajectories/{instance_id} endpoint)"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get instance data
+        cursor.execute("""
+            SELECT scenario FROM webarena_instances WHERE instance_id = %s
+        """, (instance_id,))
+        
+        instance_row = cursor.fetchone()
+        if not instance_row:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
+        
+        scenario = instance_row['scenario'] or ""
+        
+        # Get conversation (trajectory points that are actions)
+        cursor.execute("""
+            SELECT agent_id, timestamp, data_content, data_text
+            FROM webarena_trajectory_points 
+            WHERE instance_id = %s AND point_type = 'action'
+            ORDER BY timestamp
+        """, (instance_id,))
+        
         conversation = []
-        
-        for agent_id in metadata.agents:
-            trajectory = webarena_dataset.get_trajectory(instance_id, agent_id)
+        for row in cursor.fetchall():
+            content = ""
             
-            # Sort trajectory points by timestamp
-            trajectory_points = [
-                (point, trajectory.get_data_at(idx))
-                for idx, point in enumerate(trajectory.points)
-            ]
-            trajectory_points.sort(key=lambda x: x[0].timestamp)
-            
-            # Extract actions (which contain dialogue)
-            for point, data in trajectory_points:
-                if point.point_type == PointType.ACTION:
-                    # Extract the dialogue from the action
-                    content = None
-                    
-                    if isinstance(data, dict) and "content" in data:
-                        content = data.get("content", "")
-                    elif isinstance(data, str):
-                        content = data
+            # Try to get content from data_text first, then data_content
+            if row['data_text']:
+                content = row['data_text']
+            elif row['data_content']:
+                if isinstance(row['data_content'], str):
+                    try:
+                        data_content = json.loads(row['data_content'])
+                        if isinstance(data_content, dict) and 'content' in data_content:
+                            content = str(data_content['content'])
+                        else:
+                            content = str(data_content)
+                    except:
+                        content = str(row['data_content'])
+                else:
+                    if isinstance(row['data_content'], dict) and 'content' in row['data_content']:
+                        content = str(row['data_content']['content'])
                     else:
-                        # Try to convert to string if it's not a dict or string
-                        try:
-                            content = str(data)
-                        except:
-                            continue
-                    
-                    if content:
-                        # Clean up content if needed
-                        if isinstance(content, str):
-                            # Remove escaped characters
-                            content = content.replace("\\n", "\n").replace('\\"', '"')
-                        
-                        conversation.append({
-                            "agent_id": agent_id,
-                            "timestamp": point.timestamp.isoformat(),
-                            "content": content
-                        })
+                        content = str(row['data_content'])
+            
+            if content:
+                conversation.append({
+                    "agent_id": row['agent_id'],
+                    "timestamp": row['timestamp'].isoformat(),
+                    "content": content
+                })
         
-        # Sort all conversation entries by timestamp
-        conversation.sort(key=lambda x: x["timestamp"])
+        cursor.close()
         
         return {
             "instance_id": instance_id,
             "conversation": conversation,
-            "scenario": scenario
+            "scenario": scenario  
         }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error retrieving WebArena trajectory for {instance_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=404, detail=f"WebArena instance not found: {str(e)}")
+        logger.error(f"Error querying WebArena conversation for instance {instance_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-
-# --- NEW ENDPOINT for Specific WebArena Metrics ---
 @app.get("/webarena/instances/{instance_id}/metrics/{agent_id}")
-async def get_webarena_instance_agent_metrics(instance_id: str, agent_id: str):
-    """Get metrics for a specific WebArena instance (agent_id must be 'agent')."""
-    logger.info(f"Attempting to get WebArena metrics for instance='{instance_id}', agent='{agent_id}'")
-
-    # --- Validate requested agent_id ---
-    if agent_id != "agent":
-        logger.warning(f"Invalid agent_id '{agent_id}' requested for WebArena instance '{instance_id}'. Only 'agent' is supported.")
-        raise HTTPException(status_code=400, detail="Invalid agent_id for WebArena. Only 'agent' is supported.")
-    # --- End Validation ---
-
-    if not webarena_metrics_file.exists():
-        logger.warning(f"WebArena metrics file not found at {webarena_metrics_file} for instance {instance_id}, agent {agent_id}")
-        raise HTTPException(status_code=404, detail="WebArena metrics file not found")
-
+async def get_webarena_instance_agent_metrics_db(instance_id: str, agent_id: str):
+    """Get metrics for a specific WebArena instance and agent from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
     try:
-        line_number = 0
-        with open(webarena_metrics_file, "r") as f:
-            for line in f:
-                line_number += 1
-                try:
-                    metric_data = json.loads(line)
-                    file_instance_id = metric_data.get("instance_id")
-                    # --- Check agent_id in file ---
-                    file_agent_id = metric_data.get("agent_id")
-                    if file_agent_id != "agent":
-                        # Silently skip lines with incorrect agent_id in the file
-                        continue
-                    # --- End Check ---
-
-                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
-                    ids_match = file_instance_id == instance_id
-                    # agents_match is implicitly true if we reach here, as both request and file agent_id must be 'agent'
-                    logger.debug(f"Line {line_number}: Instance match: {ids_match}")
-
-                    if ids_match: # Only need to check instance ID now
-                        logger.info(f"Found WebArena match on line {line_number} for instance='{instance_id}', agent='agent'")
-                        response_data = {}
-                        for key, value in metric_data.items():
-                             if isinstance(value, (int, float)) or (key.endswith("_reasoning") and isinstance(value, str)):
-                                 response_data[key] = value
-                        # Return the validated agent_id from the request
-                        response_data["instance_id"] = instance_id
-                        response_data["agent_id"] = agent_id # Should always be 'agent'
-                        return response_data
-                except json.JSONDecodeError:
-                    logger.error(f"Error parsing JSON on line {line_number} in WebArena metrics file: {line.strip()}")
-                    continue
-                except Exception as e: # Catch other potential errors per line
-                    logger.error(f"Error processing line {line_number} in WebArena metrics file: {line.strip()} - {e}")
-                    continue
-
-        # If loop finishes without finding a match for the instance_id with agent_id='agent'
-        logger.warning(f"WebArena metrics search completed. No match found for instance {instance_id} (with agent_id='agent') after checking {line_number} lines.")
-        raise HTTPException(status_code=404, detail="Metrics not found for this WebArena instance with agent_id='agent'")
-
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT metric_name, metric_value, reasoning
+            FROM webarena_metrics 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY metric_name
+        """, (instance_id, agent_id))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        if not results:
+            raise HTTPException(status_code=404, detail="Metrics not found for this instance/agent combination")
+        
+        # Format the response to match the original API
+        response_data = {
+            "instance_id": instance_id,
+            "agent_id": agent_id
+        }
+        
+        for row in results:
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            response_data[metric_name] = metric_value
+            if reasoning:
+                response_data[f"{metric_name}_reasoning"] = reasoning
+        
+        return response_data
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
-# --- END NEW ENDPOINT ---
+        logger.error(f"Error querying WebArena metrics for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webarena/metrics/instances")
+def get_webarena_metrics_by_instance():
+    """Get a mapping of instance IDs to their available metrics from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT instance_id, agent_id, metric_name, metric_value, reasoning
+            FROM webarena_metrics 
+            ORDER BY instance_id, agent_id, metric_name
+        """)
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        # Create a mapping of instance_id -> agent_id -> metrics
+        instance_metrics = {}
+        
+        for row in results:
+            instance_id = row['instance_id']
+            agent_id = row['agent_id']
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            # Initialize the instance entry if it doesn't exist
+            if instance_id not in instance_metrics:
+                instance_metrics[instance_id] = {}
+            
+            # Initialize the agent entry if it doesn't exist
+            if agent_id not in instance_metrics[instance_id]:
+                instance_metrics[instance_id][agent_id] = {
+                    "metrics": {},
+                    "reasoning": {}
+                }
+            
+            # Add metric and reasoning
+            instance_metrics[instance_id][agent_id]["metrics"][metric_name] = metric_value
+            if reasoning:
+                instance_metrics[instance_id][agent_id]["reasoning"][metric_name] = reasoning
+        
+        return instance_metrics
+        
+    except Exception as e:
+        logger.error(f"Error querying WebArena metrics by instance: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+# --- END NEW DATABASE-BACKED WEBARENA ENDPOINTS ---
 
 @app.get("/webvoyager/instances")
 def get_webvoyager_instances():
@@ -978,8 +887,399 @@ async def get_webvoyager_instance_agent_metrics(instance_id: str, agent_id: str)
         logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
 
+# --- NEW DATABASE-BACKED SOTOPIA ENDPOINTS ---
+
+@app.get("/sotopia/instances")
+def get_sotopia_instances():
+    """Get all Sotopia instances from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT instance_id, timestamp, scenario, experiment_tag, 
+                   models, rewards, label, metadata, created_at
+            FROM sotopia_instances 
+            ORDER BY timestamp DESC
+        """)
+        
+        results = cursor.fetchall()
+        instances = []
+        
+        for row in results:
+            instance_data = dict(row)
+            
+            # Convert datetime to string for JSON serialization
+            if instance_data['timestamp']:
+                instance_data['timestamp'] = instance_data['timestamp'].isoformat()
+            if instance_data['created_at']:
+                instance_data['created_at'] = instance_data['created_at'].isoformat()
+            
+            # Parse JSONB fields
+            if instance_data['models'] and isinstance(instance_data['models'], str):
+                try:
+                    instance_data['models'] = json.loads(instance_data['models'])
+                except:
+                    pass
+            
+            if instance_data['rewards'] and isinstance(instance_data['rewards'], str):
+                try:
+                    instance_data['rewards'] = json.loads(instance_data['rewards'])
+                except:
+                    pass
+            
+            if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
+                try:
+                    instance_data['metadata'] = json.loads(instance_data['metadata'])
+                except:
+                    pass
+            
+            instances.append(instance_data)
+        
+        cursor.close()
+        return instances
+        
+    except Exception as e:
+        logger.error(f"Error querying Sotopia instances: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/sotopia/instances/{instance_id}")
+def get_sotopia_instance(instance_id: str):
+    """Get details for a specific Sotopia instance"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get instance data
+        cursor.execute("""
+            SELECT instance_id, timestamp, scenario, experiment_tag, 
+                   models, rewards, label, metadata, created_at
+            FROM sotopia_instances 
+            WHERE instance_id = %s
+        """, (instance_id,))
+        
+        instance_row = cursor.fetchone()
+        if not instance_row:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
+        
+        instance_data = dict(instance_row)
+        
+        # Convert datetime to string for JSON serialization
+        if instance_data['timestamp']:
+            instance_data['timestamp'] = instance_data['timestamp'].isoformat()
+        if instance_data['created_at']:
+            instance_data['created_at'] = instance_data['created_at'].isoformat()
+        
+        # Parse JSONB fields
+        if instance_data['models'] and isinstance(instance_data['models'], str):
+            try:
+                instance_data['models'] = json.loads(instance_data['models'])
+            except:
+                pass
+        
+        if instance_data['rewards'] and isinstance(instance_data['rewards'], str):
+            try:
+                instance_data['rewards'] = json.loads(instance_data['rewards'])
+            except:
+                pass
+        
+        if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
+            try:
+                instance_data['metadata'] = json.loads(instance_data['metadata'])
+            except:
+                pass
+        
+        # Get agents for this instance
+        cursor.execute("""
+            SELECT agent_id, agent_type, capabilities, parameters, background
+            FROM sotopia_agents 
+            WHERE instance_id = %s
+            ORDER BY agent_id
+        """, (instance_id,))
+        
+        agents = []
+        for agent_row in cursor.fetchall():
+            agent_data = dict(agent_row)
+            
+            # Parse JSONB fields
+            if agent_data['capabilities'] and isinstance(agent_data['capabilities'], str):
+                try:
+                    agent_data['capabilities'] = json.loads(agent_data['capabilities'])
+                except:
+                    pass
+            
+            if agent_data['parameters'] and isinstance(agent_data['parameters'], str):
+                try:
+                    agent_data['parameters'] = json.loads(agent_data['parameters'])
+                except:
+                    pass
+            
+            agents.append(agent_data)
+        
+        instance_data['agents'] = agents
+        cursor.close()
+        
+        return instance_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying Sotopia instance {instance_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/sotopia/instances/{instance_id}/trajectory/{agent_id}")
+def get_sotopia_trajectory(instance_id: str, agent_id: str):
+    """Get trajectory data for a specific agent in a Sotopia instance"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get trajectory points
+        cursor.execute("""
+            SELECT timestamp, point_type, media_type, data_content, data_text, metadata, point_index
+            FROM sotopia_trajectory_points 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY timestamp, point_index
+        """, (instance_id, agent_id))
+        
+        trajectory_points = []
+        for row in cursor.fetchall():
+            point_data = dict(row)
+            
+            # Convert datetime to string for JSON serialization
+            if point_data['timestamp']:
+                point_data['timestamp'] = point_data['timestamp'].isoformat()
+            
+            # Parse JSONB fields
+            if point_data['data_content'] and isinstance(point_data['data_content'], str):
+                try:
+                    point_data['data_content'] = json.loads(point_data['data_content'])
+                except:
+                    pass
+            
+            if point_data['metadata'] and isinstance(point_data['metadata'], str):
+                try:
+                    point_data['metadata'] = json.loads(point_data['metadata'])
+                except:
+                    pass
+            
+            trajectory_points.append(point_data)
+        
+        cursor.close()
+        
+        return {
+            "instance_id": instance_id,
+            "agent_id": agent_id,
+            "trajectory_points": trajectory_points
+        }
+        
+    except Exception as e:
+        logger.error(f"Error querying Sotopia trajectory for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/sotopia/instances/{instance_id}/conversation")
+def get_sotopia_conversation(instance_id: str):
+    """Get conversation data for a Sotopia instance (similar to the original /trajectories/{instance_id} endpoint)"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Get instance data
+        cursor.execute("""
+            SELECT scenario FROM sotopia_instances WHERE instance_id = %s
+        """, (instance_id,))
+        
+        instance_row = cursor.fetchone()
+        if not instance_row:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
+        
+        scenario = instance_row['scenario'] or ""
+        
+        # Get agent backgrounds
+        cursor.execute("""
+            SELECT agent_id, background FROM sotopia_agents 
+            WHERE instance_id = %s AND background IS NOT NULL AND background != ''
+        """, (instance_id,))
+        
+        agent_backgrounds = {}
+        for row in cursor.fetchall():
+            agent_backgrounds[row['agent_id']] = row['background']
+        
+        # Get conversation (trajectory points that are actions)
+        cursor.execute("""
+            SELECT agent_id, timestamp, data_content, data_text
+            FROM sotopia_trajectory_points 
+            WHERE instance_id = %s AND point_type = 'action'
+            ORDER BY timestamp
+        """, (instance_id,))
+        
+        conversation = []
+        for row in cursor.fetchall():
+            content = ""
+            
+            # Try to get content from data_text first, then data_content
+            if row['data_text']:
+                content = row['data_text']
+            elif row['data_content']:
+                if isinstance(row['data_content'], str):
+                    try:
+                        data_content = json.loads(row['data_content'])
+                        if isinstance(data_content, dict) and 'content' in data_content:
+                            content = str(data_content['content'])
+                        else:
+                            content = str(data_content)
+                    except:
+                        content = str(row['data_content'])
+                else:
+                    if isinstance(row['data_content'], dict) and 'content' in row['data_content']:
+                        content = str(row['data_content']['content'])
+                    else:
+                        content = str(row['data_content'])
+            
+            if content:
+                conversation.append({
+                    "agent_id": row['agent_id'],
+                    "timestamp": row['timestamp'].isoformat(),
+                    "content": content
+                })
+        
+        cursor.close()
+        
+        return {
+            "instance_id": instance_id,
+            "conversation": conversation,
+            "scenario": scenario,
+            "agent_backgrounds": agent_backgrounds
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying Sotopia conversation for instance {instance_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/sotopia/instances/{instance_id}/metrics/{agent_id}")
+async def get_sotopia_instance_agent_metrics(instance_id: str, agent_id: str):
+    """Get metrics for a specific Sotopia instance and agent from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT metric_name, metric_value, reasoning
+            FROM sotopia_metrics 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY metric_name
+        """, (instance_id, agent_id))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        if not results:
+            raise HTTPException(status_code=404, detail="Metrics not found for this instance/agent combination")
+        
+        # Format the response to match the original API
+        response_data = {
+            "instance_id": instance_id,
+            "agent_id": agent_id
+        }
+        
+        for row in results:
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            response_data[metric_name] = metric_value
+            if reasoning:
+                response_data[f"{metric_name}_reasoning"] = reasoning
+        
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying Sotopia metrics for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/sotopia/metrics/instances")
+def get_sotopia_metrics_by_instance():
+    """Get a mapping of instance IDs to their available metrics from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT instance_id, agent_id, metric_name, metric_value, reasoning
+            FROM sotopia_metrics 
+            ORDER BY instance_id, agent_id, metric_name
+        """)
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        # Create a mapping of instance_id -> agent_id -> metrics
+        instance_metrics = {}
+        
+        for row in results:
+            instance_id = row['instance_id']
+            agent_id = row['agent_id']
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            # Initialize the instance entry if it doesn't exist
+            if instance_id not in instance_metrics:
+                instance_metrics[instance_id] = {}
+            
+            # Initialize the agent entry if it doesn't exist
+            if agent_id not in instance_metrics[instance_id]:
+                instance_metrics[instance_id][agent_id] = {
+                    "metrics": {},
+                    "reasoning": {}
+                }
+            
+            # Add metric and reasoning
+            instance_metrics[instance_id][agent_id]["metrics"][metric_name] = metric_value
+            if reasoning:
+                instance_metrics[instance_id][agent_id]["reasoning"][metric_name] = reasoning
+        
+        return instance_metrics
+        
+    except Exception as e:
+        logger.error(f"Error querying Sotopia metrics by instance: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+# --- END NEW DATABASE-BACKED SOTOPIA ENDPOINTS ---
+
 if __name__ == "__main__":
-    import uvicorn
-    # Add reload=True for development convenience
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port)
 

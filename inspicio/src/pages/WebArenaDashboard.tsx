@@ -85,8 +85,8 @@ function WebArenaDashboard() {
   useEffect(() => {
     async function fetchLabels() {
       try {
-        // Use the dedicated WebArena endpoint
-        const response = await fetch("http://localhost:8000/webarena/trajectories");
+        // Use the new database-backed WebArena endpoint
+        const response = await fetch("http://localhost:8000/webarena/instances");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data: Label[] = await response.json();
         setLabels(data);
@@ -107,8 +107,8 @@ function WebArenaDashboard() {
     setConversation([]);
 
     try {
-      // Use the WebArena-specific endpoint
-      const response = await fetch(`http://localhost:8000/webarena/trajectories/${instanceId}`);
+      // Use the new database-backed WebArena endpoint
+      const response = await fetch(`http://localhost:8000/webarena/instances/${instanceId}/conversation`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data: ConversationData = await response.json();
       setConversation(data.conversation || []);

@@ -1,0 +1,10 @@
+inspicio/
+src/
+notebooks/
+.data/
+.venv/
+node_modules/
+.git/
+.mypy_cache/
+.ruff_cache/
+__pycache__/

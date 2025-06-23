@@ -86,7 +86,7 @@ const MetricSidebar = ({ instanceId, agentId }: MetricSidebarProps) => {
         setError(null);
         setMetrics(null);
 
-        const response = await fetch(`/api/instances/${instanceId}/metrics/${agentId}`);
+        const response = await fetch(`http://localhost:8000/sotopia/instances/${instanceId}/metrics/${agentId}`);
 
         if (!response.ok) {
           if (response.status === 404) {
