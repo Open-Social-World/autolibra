@@ -13,7 +13,6 @@ def check_dependencies():
         return False
     
     try:
-        # Add the package directory to the Python path
         sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
         from osw_data.dataset import MultiAgentDataset
         print("✓ osw_data package is available")
@@ -68,7 +67,6 @@ def run_migration(dataset_name):
     print("="*60)
     
     try:
-        # Import and run the migration
         from unified_migration import UnifiedMigration
         
         migration = UnifiedMigration(dataset_name)
@@ -87,19 +85,16 @@ def main():
     print("UNIFIED MIGRATION SCRIPT")
     print("="*60)
     
-    # Check dependencies
     print("\nChecking dependencies...")
     if not check_dependencies():
         print("\nPlease install missing dependencies and try again.")
         return
     
-    # Check database connection
     print("\nChecking database connection...")
     if not check_database_connection():
         print("\nPlease fix database connection issues and try again.")
         return
     
-    # Check data paths
     print("\nChecking data paths...")
     if not check_data_paths():
         print("\nSome data paths are missing. Migration may be incomplete.")
@@ -107,7 +102,6 @@ def main():
         if response.lower() != 'y':
             return
     
-    # Ask user which datasets to migrate
     print("\nWhich datasets would you like to migrate?")
     print("1. Sotopia only")
     print("2. WebArena only")
@@ -126,14 +120,13 @@ def main():
         datasets_to_migrate = ["webarena"]
     else:
         datasets_to_migrate = ["sotopia", "webarena"]
-    
-    # Run migrations
+ 
     success_count = 0
     for dataset_name in datasets_to_migrate:
         if run_migration(dataset_name):
             success_count += 1
     
-    # Summary
+
     print(f"\n" + "="*60)
     print("MIGRATION SUMMARY")
     print("="*60)

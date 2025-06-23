@@ -17,17 +17,15 @@ from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType, MediaType
 from osw_data.annotation import AnnotationSystem
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Database configuration
 DB_CONFIG = {
-    "dbname": os.getenv("DB_NAME", "autolibra"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "Yankayee123"),
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": os.getenv("DB_PORT", "5432")
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT"),
 }
 
 # Dataset configurations
@@ -66,6 +64,16 @@ class UnifiedMigration:
         self.config = DATASET_CONFIGS[dataset_name]
         self.conn = None
         self.cursor = None
+        
+    def validate_db_config(self):
+        """Validate that all required database environment variables are set"""
+        required_vars = ["DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST"]
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        
+        if missing_vars:
+            raise ValueError(f"Missing required database environment variables: {', '.join(missing_vars)}")
+        
+        logger.info("Database configuration validation passed")
         
     def connect_to_db(self):
         """Establish database connection"""
@@ -572,6 +580,7 @@ class UnifiedMigration:
         logger.info(f"Starting {self.dataset_name} data migration to PostgreSQL...")
         
         try:
+            self.validate_db_config()
             self.connect_to_db()
             self.create_tables()
             self.migrate_instances_and_agents()

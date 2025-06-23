@@ -6,42 +6,29 @@ import sys
 from contextlib import asynccontextmanager
 import re
 import logging
-# Add pydantic for request body validation
 from pydantic import BaseModel
-# Add datetime for timestamps
 from datetime import datetime
-import os # Import os for sorting agent files numerically
+import os
 from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 import psycopg2
-import psycopg2.extras  # For better handling of query results
+import psycopg2.extras 
 import uvicorn
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
 from osw_data.annotation import AnnotationSystem, AnnotationSpan
 
-# TEMPORARY Add the package directory to the Python path
-sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
-# Define annotation path
 annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations" / "sotopia"
-# --- Add path for WebArena data ---
-webarena_dataset_path = Path(__file__).parent.parent.parent / ".data" / "webarena"
-# --- Add path for WebArena instances (still useful for direct access if needed, but not for listing via dataset) ---
-webarena_instances_path = webarena_dataset_path / "instances"
-
-# --- Add path for WebArena metrics ---
-webarena_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webarena" / "8_metrics" / "llm_eval_results.jsonl"
-# --- Add path for WebVoyager dataset ---
 webvoyager_path = Path(__file__).parent.parent.parent / ".data" / "nnetnav_openweb_3"
 webvoyager_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webvoyager_nnetnav" / "8_metrics" / "llm_eval_results.jsonl"
-# --- End Add paths ---
 
-# Add at the top of the file
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Define a Pydantic model for the annotation payload
 class AnnotationPayload(BaseModel):
     instance_id: str
     agent_id: str
@@ -51,13 +38,12 @@ class AnnotationPayload(BaseModel):
     start_offset: int
     end_offset: int
 
-# Database connection parameters
 DB_CONFIG = {
-    "dbname": os.getenv("DB_NAME", "autolibra"),
-    "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "Yankayee123"),
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": os.getenv("DB_PORT", "5432")
+    "dbname": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "host": os.getenv("DB_HOST"),
+    "port": os.getenv("DB_PORT"),
 }
 
 # Function to get database connection
