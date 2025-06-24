@@ -306,6 +306,7 @@ function WebArenaDashboard() {
                       isLoading={false}
                       instanceId={selectedInstance}
                       agentId="agent"
+                      dataset="webarena"
                     />
                   </div>
                 ) : (

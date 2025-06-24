@@ -342,6 +342,7 @@ function SotopiaDashboard() {
                          instanceId={selectedInstance}
                          // Pass the specific agentId for this instance
                          agentId={agentId}
+                         dataset="sotopia"
                        />
                      </div>
                    ))

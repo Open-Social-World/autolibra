@@ -10,6 +10,7 @@ interface CommentSystemProps {
   isLoading?: boolean;
   instanceId: string | null;
   agentId: string;
+  dataset?: string; // Add dataset prop with default
 }
 
 // Define comment structure (Combine elements from both versions)
@@ -40,7 +41,8 @@ const CommentSystem: React.FC<CommentSystemProps> = ({
     initialText,
     isLoading = false,
     instanceId,
-    agentId
+    agentId,
+    dataset = "webvoyager" // Default to webvoyager
 }) => {
   const [text, setText] = useState(initialText);
   const [selection, setSelection] = useState<any>(null); // Keep state
@@ -123,6 +125,7 @@ const CommentSystem: React.FC<CommentSystemProps> = ({
 
     // Data for backend (Keep this)
     const commentData = {
+      dataset: dataset, // Add dataset field
       instance_id: instanceId,
       agent_id: agentId,
       annotator_id: annotatorId.trim(),

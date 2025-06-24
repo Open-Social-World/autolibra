@@ -43,35 +43,55 @@ import { AppSidebar } from "../components/sidebar";
 // Interface for mock instances from the database
 interface MockInstance {
   instance_id: string;
+  timestamp: string;
+  scenario: string;
+  experiment_tag: string;
+  source_model: string;
   label: string;
-  folder_path: string;
+  metadata: any;
+  summary_info: any;
+  created_at: string;
 }
 
-// Interface for file data from the database
-interface FileData {
-  id: number;
-  filename: string;
-  filepath: string;
-  filetype: string;
-  filesize: number;
+// Interface for agent data from the database
+interface AgentData {
+  agent_id: string;
+  agent_type: string;
+  capabilities: any;
+  parameters: any;
+  background: string;
+  additional_info: any;
+}
+
+// Interface for screenshot data from the database
+interface ScreenshotData {
+  step_number: number;
+  screenshot_data: string; // base64 encoded
+  file_size: number;
   created_at: string;
-  description?: string;
-  metadata?: any;
+}
+
+// Interface for step file data from the database
+interface StepFileData {
+  step_number: number;
+  step_data: string; // base64 encoded
+  file_size: number;
+  created_at: string;
 }
 
 // Interface for instance details
 interface InstanceDetails {
   instance_id: string;
-  folder_path: string;
-  description: string;
-  files: FileData[];
+  instance_data: MockInstance;
+  agents: AgentData[];
   log_content: string | null;
-  screenshot_log_pairs: ScreenshotLogPair[];
+  screenshots: ScreenshotData[];
+  step_files: StepFileData[];
 }
 
 // Add a new interface for screenshot-log pairs
 interface ScreenshotLogPair {
-  screenshot_id: number;
+  step_number: number;
   log_segment: string;
 }
 
@@ -165,9 +185,9 @@ function WebVoyagerDashboard() {
       const selectedIndex = carouselApi.selectedScrollSnap();
       setCurrentIndex(selectedIndex);
       
-      if (instanceDetails?.screenshot_log_pairs && 
-          instanceDetails.screenshot_log_pairs[selectedIndex]) {
-        setCurrentLogSegment(instanceDetails.screenshot_log_pairs[selectedIndex].log_segment);
+      // For now, we'll use the log content directly since we don't have segmented logs
+      if (instanceDetails?.log_content) {
+        setCurrentLogSegment(instanceDetails.log_content);
       } else {
         setCurrentLogSegment("");
       }
@@ -196,22 +216,16 @@ function WebVoyagerDashboard() {
       const data: InstanceDetails = await response.json();
       setInstanceDetails(data);
       
-      // Extract screenshots from files
-      const screenshotFiles = data.files.filter(file => 
-        file.filetype === 'image/png' || 
-        file.filetype === 'image/jpeg'
-      );
-      
-      // Create URLs for screenshots
-      const screenshotUrls = screenshotFiles.map(file => 
-        `http://localhost:8000/webvoyager/files/${file.id}`
+      // Create URLs for screenshots using the new endpoint structure
+      const screenshotUrls = data.screenshots.map(screenshot => 
+        `http://localhost:8000/webvoyager/screenshots/${instanceId}/${screenshot.step_number}`
       );
       
       setScreenshots(screenshotUrls);
       
-      // Set the initial log segment if available
-      if (data.screenshot_log_pairs && data.screenshot_log_pairs.length > 0) {
-        setCurrentLogSegment(data.screenshot_log_pairs[0].log_segment);
+      // Set the initial log content if available
+      if (data.log_content) {
+        setCurrentLogSegment(data.log_content);
       }
       
       setDetailsLoading(false);
@@ -326,7 +340,7 @@ function WebVoyagerDashboard() {
                     <Header
                       title={
                         selectedInstance
-                          ? instances.find(i => i.instance_id === selectedInstance)?.label || ""
+                          ? instanceDetails?.instance_data?.label || selectedInstance
                           : "Interaction Details"
                       }
                       subtitle1={`Experiment ID: ${selectedInstance}`}
@@ -396,6 +410,7 @@ function WebVoyagerDashboard() {
                           isLoading={false}
                           instanceId={selectedInstance}
                           agentId="agent"
+                          dataset="webvoyager"
                         />
                       ) : (
                         <div className="text-center text-muted-foreground">
@@ -423,7 +438,7 @@ function WebVoyagerDashboard() {
                     <div>
                       <h3 className="text-sm font-medium">Description</h3>
                       <p className="text-sm text-muted-foreground">
-                        {instanceDetails?.description || "No description available"}
+                        {instanceDetails?.instance_data.label || "No description available"}
                       </p>
                     </div>
                     
@@ -437,23 +452,23 @@ function WebVoyagerDashboard() {
                     <Separator className="my-4" />
                     
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Files</h3>
+                      <h3 className="text-sm font-medium mb-2">Step Files</h3>
                       <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                        {instanceDetails?.files.map(file => (
-                          <div key={file.id} className="text-xs p-2 bg-muted rounded-md">
-                            <div className="font-medium">{file.filename}</div>
+                        {instanceDetails?.step_files.map(file => (
+                          <div key={file.step_number} className="text-xs p-2 bg-muted rounded-md">
+                            <div className="font-medium">Step {file.step_number}</div>
                             <div className="text-muted-foreground flex justify-between">
-                              <span>{file.filetype.split('/')[1]}</span>
-                              <span>{formatFileSize(file.filesize)}</span>
+                              <span>Pickle file</span>
+                              <span>{formatFileSize(file.file_size)}</span>
                             </div>
                             <div className="mt-1 flex justify-end">
                               <a 
-                                href={`http://localhost:8000/webvoyager/files/${file.id}`} 
+                                href={`http://localhost:8000/webvoyager/step_files/${selectedInstance}/${file.step_number}`} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="text-xs flex items-center gap-1 text-blue-500 hover:text-blue-700"
                               >
-                                View <ExternalLink className="h-3 w-3" />
+                                Download <ExternalLink className="h-3 w-3" />
                               </a>
                             </div>
                           </div>

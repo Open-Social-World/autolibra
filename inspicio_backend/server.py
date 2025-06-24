@@ -9,27 +9,25 @@ import logging
 from pydantic import BaseModel
 from datetime import datetime
 import os
-from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 import psycopg2
 import psycopg2.extras 
 import uvicorn
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
+
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
 from osw_data.annotation import AnnotationSystem, AnnotationSpan
 
-annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations" / "sotopia"
-webvoyager_path = Path(__file__).parent.parent.parent / ".data" / "nnetnav_openweb_3"
-webvoyager_metrics_file = Path(__file__).parent.parent.parent / ".data" / "metrics" / "webvoyager_nnetnav" / "8_metrics" / "llm_eval_results.jsonl"
+base_annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AnnotationPayload(BaseModel):
+    dataset: str  
     instance_id: str
     agent_id: str
     annotator_id: str
@@ -55,10 +53,106 @@ def get_db_connection():
         logger.error(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
 
+# Function to get annotation system for a specific dataset
+def get_annotation_system(dataset: str) -> Optional[AnnotationSystem]:
+    """Get the annotation system for a specific dataset"""
+    if dataset not in annotation_systems:
+        logger.error(f"Annotation system not found for dataset: {dataset}")
+        return None
+    return annotation_systems[dataset]
+
+def save_annotation_to_db(dataset: str, annotation_id: str, instance_id: str, agent_id: str, 
+                         annotator_id: str, content: dict, created_at: datetime, 
+                         updated_at: datetime, start_time: datetime = None, 
+                         end_time: datetime = None, confidence: float = None, 
+                         metadata: dict = None):
+    """Save annotation to the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise Exception("Database connection not available")
+    
+    # Validate dataset
+    supported_datasets = ["sotopia", "webarena", "webvoyager"]
+    if dataset not in supported_datasets:
+        raise Exception(f"Unsupported dataset: {dataset}. Supported datasets: {supported_datasets}")
+    
+    try:
+        cursor = db_conn.cursor()
+        table_name = f"{dataset}_annotations"
+        
+        # Ensure the annotation table exists
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id SERIAL PRIMARY KEY,
+                annotation_id VARCHAR(255) UNIQUE NOT NULL,
+                instance_id VARCHAR(255) NOT NULL,
+                agent_id VARCHAR(255) NOT NULL,
+                annotator_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP,
+                content JSONB NOT NULL,
+                start_time TIMESTAMP,
+                end_time TIMESTAMP,
+                confidence FLOAT,
+                metadata JSONB,
+                created_at_db TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Create indexes if they don't exist
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{dataset}_annotations_instance ON {table_name}(instance_id)")
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{dataset}_annotations_agent ON {table_name}(agent_id)")
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{dataset}_annotations_annotator ON {table_name}(annotator_id)")
+        cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{dataset}_annotations_annotation_id ON {table_name}(annotation_id)")
+        
+        # Insert the annotation
+        cursor.execute(f"""
+            INSERT INTO {table_name} 
+            (annotation_id, instance_id, agent_id, annotator_id, created_at, updated_at, 
+             content, start_time, end_time, confidence, metadata)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (annotation_id) DO UPDATE SET
+            instance_id = EXCLUDED.instance_id,
+            agent_id = EXCLUDED.agent_id,
+            annotator_id = EXCLUDED.annotator_id,
+            created_at = EXCLUDED.created_at,
+            updated_at = EXCLUDED.updated_at,
+            content = EXCLUDED.content,
+            start_time = EXCLUDED.start_time,
+            end_time = EXCLUDED.end_time,
+            confidence = EXCLUDED.confidence,
+            metadata = EXCLUDED.metadata
+        """, (
+            annotation_id,
+            instance_id,
+            agent_id,
+            annotator_id,
+            created_at,
+            updated_at,
+            json.dumps(content) if content else '{}',
+            start_time,
+            end_time,
+            confidence,
+            json.dumps(metadata) if metadata else '{}'
+        ))
+        
+        db_conn.commit()
+        cursor.close()
+        logger.info(f"Annotation {annotation_id} saved to database for dataset {dataset}")
+        
+    except Exception as e:
+        logger.error(f"Error saving annotation to database: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise Exception(f"Failed to save annotation to database: {str(e)}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize dataset, load labels, and initialize annotation system
-    global dataset, instance_labels, metric_set, annotation_system, webarena_instance_labels, webarena_dataset, db_conn
+    global dataset, instance_labels, metric_set, annotation_systems, webarena_instance_labels, webarena_dataset, db_conn
     
     # Initialize database connection
     try:
@@ -68,33 +162,42 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize database connection: {e}", exc_info=True)
         db_conn = None
     
-    # Initialize Annotation System
-    try:
-        # Ensure the annotation directory exists
-        annotation_path.mkdir(parents=True, exist_ok=True)
-        
-        annotation_system = AnnotationSystem(
-            base_path=annotation_path,
-            project_name="Sotopia Web Annotation", # Give it a relevant name
-            description="Annotations added via the web interface.",
-            annotation_schema={
-                "comment": {
-                    "type": "object",
-                    "properties": {
-                        "comment_text": {"type": "string"},
-                        "selection_text": {"type": "string"},
-                        "start_offset": {"type": "integer"},
-                        "end_offset": {"type": "integer"},
-                    },
-                    "required": ["comment_text", "selection_text", "start_offset", "end_offset"],
-                    "description": "A comment linked to a text selection.",
-                }
-            },
-        )
-        logger.info(f"Annotation system initialized at {annotation_path}")
-    except Exception as e:
-        logger.error(f"Failed to initialize AnnotationSystem: {str(e)}", exc_info=True)
-        annotation_system = None # Set to None if initialization fails
+    # Initialize Annotation Systems for each dataset
+    annotation_systems = {}
+    supported_datasets = ["sotopia", "webarena", "webvoyager"]
+    
+    for dataset_name in supported_datasets:
+        try:
+            # Create dataset-specific annotation path
+            dataset_annotation_path = base_annotation_path / dataset_name
+            
+            # Ensure the annotation directory exists
+            dataset_annotation_path.mkdir(parents=True, exist_ok=True)
+            
+            annotation_system = AnnotationSystem(
+                base_path=dataset_annotation_path,
+                project_name=f"{dataset_name.title()} Web Annotation",
+                description=f"Annotations added via the web interface for {dataset_name}.",
+                annotation_schema={
+                    "comment": {
+                        "type": "object",
+                        "properties": {
+                            "comment_text": {"type": "string"},
+                            "selection_text": {"type": "string"},
+                            "start_offset": {"type": "integer"},
+                            "end_offset": {"type": "integer"},
+                        },
+                        "required": ["comment_text", "selection_text", "start_offset", "end_offset"],
+                        "description": "A comment linked to a text selection.",
+                    }
+                },
+            )
+            annotation_systems[dataset_name] = annotation_system
+            logger.info(f"Annotation system initialized for {dataset_name} at {dataset_annotation_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize AnnotationSystem for {dataset_name}: {str(e)}", exc_info=True)
+            annotation_systems[dataset_name] = None
 
     yield
     
@@ -132,9 +235,11 @@ async def create_annotation(payload: AnnotationPayload):
     """Receive and save a new annotation."""
     logger.info(f"Received annotation payload: {payload.dict()}")
 
+    # Get the appropriate annotation system for the dataset
+    annotation_system = get_annotation_system(payload.dataset)
     if not annotation_system:
-        logger.error("Annotation system not initialized.")
-        raise HTTPException(status_code=500, detail="Annotation system not available")
+        logger.error(f"Annotation system not available for dataset: {payload.dataset}")
+        raise HTTPException(status_code=500, detail=f"Annotation system not available for dataset: {payload.dataset}")
 
     # Ensure annotator exists in the system
     if payload.annotator_id not in annotation_system.project.annotators:
@@ -159,12 +264,12 @@ async def create_annotation(payload: AnnotationPayload):
             }
         }
 
-        # Add the annotation
+        # Add the annotation to the file system
         # We don't have a precise time span from the frontend comment system,
         # so we'll use the current time as a point annotation (start=end).
         # Alternatively, omit the span if your workflow allows.
         current_time = datetime.now()
-        annotation_system.add_annotation(
+        annotation = annotation_system.add_annotation(
             instance_id=payload.instance_id,
             agent_id=payload.agent_id,
             annotator_id=payload.annotator_id,
@@ -173,13 +278,139 @@ async def create_annotation(payload: AnnotationPayload):
             # span=None # Or omit span if not strictly needed here
         )
 
-        logger.info(f"Annotation saved successfully for instance {payload.instance_id}, agent {payload.agent_id}")
+        # Also save the annotation to the database
+        try:
+            save_annotation_to_db(
+                dataset=payload.dataset,
+                annotation_id=annotation.annotation_id,
+                instance_id=payload.instance_id,
+                agent_id=payload.agent_id,
+                annotator_id=payload.annotator_id,
+                content=annotation_content,
+                created_at=annotation.created_at,
+                updated_at=annotation.updated_at,
+                start_time=annotation.span.start_time if annotation.span else None,
+                end_time=annotation.span.end_time if annotation.span else None,
+                confidence=annotation.confidence,
+                metadata=annotation.metadata
+            )
+            logger.info(f"Annotation also saved to database for dataset {payload.dataset}")
+        except Exception as db_error:
+            logger.error(f"Failed to save annotation to database: {str(db_error)}")
+            # Don't fail the entire request if database save fails, but log the error
+            # The annotation is still saved to the file system
+
+        logger.info(f"Annotation saved successfully for dataset {payload.dataset}, instance {payload.instance_id}, agent {payload.agent_id}")
         return {"message": "Annotation saved successfully"}
 
     except Exception as e:
         logger.error(f"Failed to save annotation: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to save annotation: {str(e)}")
 # --- END NEW ANNOTATION ENDPOINT ---
+
+# --- NEW ANNOTATION RETRIEVAL ENDPOINTS ---
+@app.get("/annotations/{dataset}/{instance_id}/{agent_id}")
+async def get_annotations(dataset: str, instance_id: str, agent_id: str):
+    """Get annotations for a specific dataset, instance, and agent from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        table_name = f"{dataset}_annotations"
+        
+        cursor.execute(f"""
+            SELECT annotation_id, annotator_id, created_at, updated_at, 
+                   content, start_time, end_time, confidence, metadata
+            FROM {table_name} 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY created_at DESC
+        """, (instance_id, agent_id))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        annotations = []
+        for row in results:
+            annotation_data = {
+                'annotation_id': row['annotation_id'],
+                'annotator_id': row['annotator_id'],
+                'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+                'updated_at': row['updated_at'].isoformat() if row['updated_at'] else None,
+                'content': row['content'] if isinstance(row['content'], dict) else {},
+                'start_time': row['start_time'].isoformat() if row['start_time'] else None,
+                'end_time': row['end_time'].isoformat() if row['end_time'] else None,
+                'confidence': row['confidence'],
+                'metadata': row['metadata'] if isinstance(row['metadata'], dict) else {}
+            }
+            annotations.append(annotation_data)
+        
+        return {
+            "dataset": dataset,
+            "instance_id": instance_id,
+            "agent_id": agent_id,
+            "annotations": annotations
+        }
+        
+    except Exception as e:
+        logger.error(f"Error querying annotations for dataset {dataset}, instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/annotations/{dataset}")
+async def get_dataset_annotations(dataset: str):
+    """Get all annotations for a specific dataset from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    # Validate dataset
+    supported_datasets = ["sotopia", "webarena", "webvoyager"]
+    if dataset not in supported_datasets:
+        raise HTTPException(status_code=400, detail=f"Unsupported dataset: {dataset}. Supported datasets: {supported_datasets}")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        table_name = f"{dataset}_annotations"
+        
+        cursor.execute(f"""
+            SELECT annotation_id, instance_id, agent_id, annotator_id, created_at, updated_at, 
+                   content, start_time, end_time, confidence, metadata
+            FROM {table_name} 
+            ORDER BY created_at DESC
+        """)
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        annotations = []
+        for row in results:
+            annotation_data = {
+                'annotation_id': row['annotation_id'],
+                'instance_id': row['instance_id'],
+                'agent_id': row['agent_id'],
+                'annotator_id': row['annotator_id'],
+                'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+                'updated_at': row['updated_at'].isoformat() if row['updated_at'] else None,
+                'content': row['content'] if isinstance(row['content'], dict) else {},
+                'start_time': row['start_time'].isoformat() if row['start_time'] else None,
+                'end_time': row['end_time'].isoformat() if row['end_time'] else None,
+                'confidence': row['confidence'],
+                'metadata': row['metadata'] if isinstance(row['metadata'], dict) else {}
+            }
+            annotations.append(annotation_data)
+        
+        return {
+            "dataset": dataset,
+            "annotations": annotations,
+            "count": len(annotations)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error querying annotations for dataset {dataset}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+# --- END NEW ANNOTATION RETRIEVAL ENDPOINTS ---
 
 # --- NEW DATABASE-BACKED WEBARENA ENDPOINTS ---
 
@@ -203,22 +434,23 @@ def get_webarena_instances():
         instances = []
         
         for row in results:
-            instance_data = dict(row)
-            
-            # Convert datetime to string for JSON serialization
-            if instance_data['timestamp']:
-                instance_data['timestamp'] = instance_data['timestamp'].isoformat()
-            if instance_data['created_at']:
-                instance_data['created_at'] = instance_data['created_at'].isoformat()
-            
-            # Parse JSONB fields
-            if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
-                try:
-                    instance_data['metadata'] = json.loads(instance_data['metadata'])
-                except:
-                    pass
-            
-            instances.append(instance_data)
+            try:
+                # Create a clean dictionary from the row data
+                instance_data = {
+                    'instance_id': row['instance_id'],
+                    'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                    'scenario': row['scenario'] or '',
+                    'source_model': row['source_model'] or '',
+                    'label': row['label'] or 'Unlabeled',
+                    'metadata': row['metadata'] if isinstance(row['metadata'], dict) else {},
+                    'created_at': row['created_at'].isoformat() if row['created_at'] else None
+                }
+                
+                instances.append(instance_data)
+                
+            except Exception as row_error:
+                logger.error(f"Error processing row {row}: {row_error}")
+                continue
         
         cursor.close()
         return instances
@@ -262,11 +494,12 @@ def get_webarena_instance(instance_id: str):
             instance_data['created_at'] = instance_data['created_at'].isoformat()
         
         # Parse JSONB fields
-        if instance_data['metadata'] and isinstance(instance_data['metadata'], str):
-            try:
-                instance_data['metadata'] = json.loads(instance_data['metadata'])
-            except:
-                pass
+        if instance_data['metadata'] is not None:
+            # JSONB fields are already parsed as Python objects by psycopg2
+            if not isinstance(instance_data['metadata'], dict):
+                instance_data['metadata'] = {}
+        else:
+            instance_data['metadata'] = {}
         
         # Get agents for this instance
         cursor.execute("""
@@ -281,23 +514,26 @@ def get_webarena_instance(instance_id: str):
             agent_data = dict(agent_row)
             
             # Parse JSONB fields
-            if agent_data['capabilities'] and isinstance(agent_data['capabilities'], str):
-                try:
-                    agent_data['capabilities'] = json.loads(agent_data['capabilities'])
-                except:
-                    pass
+            if agent_data['capabilities'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['capabilities'], dict):
+                    agent_data['capabilities'] = {}
+            else:
+                agent_data['capabilities'] = {}
             
-            if agent_data['parameters'] and isinstance(agent_data['parameters'], str):
-                try:
-                    agent_data['parameters'] = json.loads(agent_data['parameters'])
-                except:
-                    pass
+            if agent_data['parameters'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['parameters'], dict):
+                    agent_data['parameters'] = {}
+            else:
+                agent_data['parameters'] = {}
             
-            if agent_data['additional_info'] and isinstance(agent_data['additional_info'], str):
-                try:
-                    agent_data['additional_info'] = json.loads(agent_data['additional_info'])
-                except:
-                    pass
+            if agent_data['additional_info'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['additional_info'], dict):
+                    agent_data['additional_info'] = {}
+            else:
+                agent_data['additional_info'] = {}
             
             agents.append(agent_data)
         
@@ -560,47 +796,50 @@ def get_webvoyager_instances():
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
-        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Query to get distinct experiment folders and their descriptions
         cursor.execute("""
-            SELECT DISTINCT 
-                regexp_replace(filepath, '/[^/]*$', '') as folder_path,
-                description
-            FROM files 
-            WHERE filepath LIKE 'nnetnav_openweb_3/%'
-            AND description IS NOT NULL
-            ORDER BY folder_path
+            SELECT instance_id, timestamp, scenario, experiment_tag, source_model, 
+                   label, metadata, summary_info, created_at
+            FROM webvoyager_instances 
+            ORDER BY timestamp DESC
         """)
         
         results = cursor.fetchall()
-        
-        # Format the results
         instances = []
+        
         for row in results:
-            folder_path = row['folder_path']
-            description = row['description']
-            
-            # Extract instance_id from the folder path
-            # Assuming format like 'nnetnav_openweb_3/experiment_123'
-            parts = folder_path.split('/')
-            if len(parts) >= 2:
-                instance_id = parts[1]  # Get the experiment_XXX part
-            else:
-                instance_id = folder_path
-            
-            instances.append({
-                "instance_id": instance_id,
-                "label": description or "Unlabeled",
-                "folder_path": folder_path
-            })
+            try:
+                # Create a clean dictionary from the row data
+                instance_data = {
+                    'instance_id': row['instance_id'],
+                    'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                    'scenario': row['scenario'] or '',
+                    'experiment_tag': row['experiment_tag'] or '',
+                    'source_model': row['source_model'] or '',
+                    'label': row['label'] or 'Unlabeled',
+                    'metadata': row['metadata'] if isinstance(row['metadata'], dict) else {},
+                    'summary_info': row['summary_info'] if isinstance(row['summary_info'], dict) else {},
+                    'created_at': row['created_at'].isoformat() if row['created_at'] else None
+                }
+                
+                instances.append(instance_data)
+                
+            except Exception as row_error:
+                logger.error(f"Error processing row {row}: {row_error}")
+                continue
         
         cursor.close()
+        logger.info(f"Successfully retrieved {len(instances)} WebVoyager instances")
         return instances
         
     except Exception as e:
-        logger.error(f"Error querying WebVoyagerinstances: {str(e)}", exc_info=True)
+        logger.error(f"Error querying WebVoyager instances: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
 @app.get("/webvoyager/instances/{instance_id}")
@@ -611,147 +850,125 @@ def get_webvoyager_instance(instance_id: str):
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
-        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # First, find the folder path for this instance_id
+        # Get instance data
         cursor.execute("""
-            SELECT DISTINCT regexp_replace(filepath, '/[^/]*$', '') as folder_path
-            FROM files 
-            WHERE filepath LIKE %s
-            LIMIT 1
-        """, (f'%/{instance_id}/%',))
+            SELECT instance_id, timestamp, scenario, experiment_tag, source_model, 
+                   label, metadata, summary_info, created_at
+            FROM webvoyager_instances 
+            WHERE instance_id = %s
+        """, (instance_id,))
         
-        folder_result = cursor.fetchone()
-        if not folder_result:
+        instance_row = cursor.fetchone()
+        if not instance_row:
             raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
         
-        folder_path = folder_result['folder_path']
+        # Create a clean dictionary from the row data
+        instance_data = {
+            'instance_id': instance_row['instance_id'],
+            'timestamp': instance_row['timestamp'].isoformat() if instance_row['timestamp'] else None,
+            'scenario': instance_row['scenario'] or '',
+            'experiment_tag': instance_row['experiment_tag'] or '',
+            'source_model': instance_row['source_model'] or '',
+            'label': instance_row['label'] or 'Unlabeled',
+            'metadata': instance_row['metadata'] if isinstance(instance_row['metadata'], dict) else {},
+            'summary_info': instance_row['summary_info'] if isinstance(instance_row['summary_info'], dict) else {},
+            'created_at': instance_row['created_at'].isoformat() if instance_row['created_at'] else None
+        }
         
-        # Get all files for this instance
+        # Get agents for this instance
         cursor.execute("""
-            SELECT id, filename, filepath, filetype, filesize, 
-                   created_at, description, metadata
-            FROM files 
-            WHERE filepath LIKE %s
-            ORDER BY filepath, filename
-        """, (f'{folder_path}/%',))
+            SELECT agent_id, agent_type, capabilities, parameters, background, additional_info
+            FROM webvoyager_agents 
+            WHERE instance_id = %s
+            ORDER BY agent_id
+        """, (instance_id,))
         
-        files = []
-        log_content = None
-        log_segments = []
-        
-        # First pass to collect all files and find the log file
-        for row in cursor.fetchall():
-            file_data = dict(row)
+        agents = []
+        for agent_row in cursor.fetchall():
+            agent_data = dict(agent_row)
             
-            # Convert datetime to string for JSON serialization
-            if file_data['created_at']:
-                file_data['created_at'] = file_data['created_at'].isoformat()
-            
-            # Parse metadata JSON if it exists
-            if file_data['metadata'] and isinstance(file_data['metadata'], str):
-                try:
-                    file_data['metadata'] = json.loads(file_data['metadata'])
-                except:
-                    pass
-            
-            files.append(file_data)
-            
-            # If this is the experiment.log file, read its content
-            if file_data['filename'] == 'experiment.log':
-                try:
-                    # Fix the filepath by removing duplicate nnetnav_openweb_3 if present
-                    filepath = file_data['filepath'].lstrip('/')
-                    if filepath.startswith('nnetnav_openweb_3/nnetnav_openweb_3/'):
-                        filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
-                    
-                    # Try the corrected path first
-                    log_path = os.path.join(webvoyager_path.parent, filepath)
-                    
-                    if not os.path.exists(log_path):
-                        # Try the original path as fallback
-                        alt_log_path = os.path.join(webvoyager_path, file_data['filepath'].lstrip('/'))
-                        if os.path.exists(alt_log_path):
-                            log_path = alt_log_path
-                    
-                    if os.path.exists(log_path):
-                        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            log_content = f.read()
-                            
-                            # Split log into segments based on actions
-                            segments = []
-                            current_segment = ""
-                            
-                            for line in log_content.splitlines():
-                                current_segment += line + "\n"
-                                
-                                # If line contains "action:" it's the end of a segment
-                                if "action:" in line:
-                                    segments.append(current_segment.strip())
-                                    current_segment = ""
-                            
-                            # Add the last segment if it's not empty
-                            if current_segment.strip():
-                                segments.append(current_segment.strip())
-                                
-                            log_segments = segments
-                    else:
-                        logger.error(f"Log file not found at: {log_path}")
-                except Exception as e:
-                    logger.error(f"Error reading log file: {str(e)}")
-        
-        # Get the description (task) for this instance
-        cursor.execute("""
-            SELECT description 
-            FROM files 
-            WHERE filepath LIKE %s 
-            AND description IS NOT NULL 
-            LIMIT 1
-        """, (f'{folder_path}/%',))
-        
-        description_row = cursor.fetchone()
-        description = description_row['description'] if description_row else "Unknown Task"
-        
-        # Get screenshot files and sort them
-        screenshot_files = [f for f in files if f['filetype'] in ('image/png', 'image/jpeg')]
-        screenshot_files.sort(key=lambda x: x['filepath'])
-        
-        # Match log segments to screenshots if possible
-        screenshot_log_pairs = []
-        
-        # If we have both screenshots and log segments, try to pair them
-        if screenshot_files and log_segments:
-            # If we have more screenshots than log segments, use the available segments
-            if len(screenshot_files) > len(log_segments):
-                for i, screenshot in enumerate(screenshot_files):
-                    if i < len(log_segments):
-                        screenshot_log_pairs.append({
-                            "screenshot_id": screenshot['id'],
-                            "log_segment": log_segments[i]
-                        })
-                    else:
-                        screenshot_log_pairs.append({
-                            "screenshot_id": screenshot['id'],
-                            "log_segment": "No corresponding log segment available"
-                        })
-            # If we have more log segments than screenshots, use the first segments
+            # Parse JSONB fields
+            if agent_data['capabilities'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['capabilities'], dict):
+                    agent_data['capabilities'] = {}
             else:
-                for i, screenshot in enumerate(screenshot_files):
-                    screenshot_log_pairs.append({
-                        "screenshot_id": screenshot['id'],
-                        "log_segment": log_segments[i]
-                    })
+                agent_data['capabilities'] = {}
+            
+            if agent_data['parameters'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['parameters'], dict):
+                    agent_data['parameters'] = {}
+            else:
+                agent_data['parameters'] = {}
+            
+            if agent_data['additional_info'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['additional_info'], dict):
+                    agent_data['additional_info'] = {}
+            else:
+                agent_data['additional_info'] = {}
+            
+            agents.append(agent_data)
+        
+        instance_data['agents'] = agents
+        
+        # Get experiment log
+        cursor.execute("""
+            SELECT log_content FROM webvoyager_experiment_logs 
+            WHERE instance_id = %s
+        """, (instance_id,))
+        
+        log_row = cursor.fetchone()
+        log_content = log_row['log_content'] if log_row else None
+        
+        # Get screenshots
+        cursor.execute("""
+            SELECT step_number, screenshot_data, file_size, created_at
+            FROM webvoyager_screenshots 
+            WHERE instance_id = %s
+            ORDER BY step_number
+        """, (instance_id,))
+        
+        screenshots = []
+        for screenshot_row in cursor.fetchall():
+            # Create a clean dictionary from the screenshot row data (exclude binary data)
+            screenshot_data = {
+                'step_number': screenshot_row['step_number'],
+                'file_size': screenshot_row['file_size'],
+                'created_at': screenshot_row['created_at'].isoformat() if screenshot_row['created_at'] else None
+            }
+            screenshots.append(screenshot_data)
+        
+        # Get step files
+        cursor.execute("""
+            SELECT step_number, step_data, file_size, created_at
+            FROM webvoyager_step_files 
+            WHERE instance_id = %s
+            ORDER BY step_number
+        """, (instance_id,))
+        
+        step_files = []
+        for step_row in cursor.fetchall():
+            # Create a clean dictionary from the step row data (exclude binary data)
+            step_data = {
+                'step_number': step_row['step_number'],
+                'file_size': step_row['file_size'],
+                'created_at': step_row['created_at'].isoformat() if step_row['created_at'] else None
+            }
+            step_files.append(step_data)
         
         cursor.close()
         
         return {
             "instance_id": instance_id,
-            "folder_path": folder_path,
-            "description": description,
-            "files": files,
+            "instance_data": instance_data,
+            "agents": agents,
             "log_content": log_content,
-            "screenshot_log_pairs": screenshot_log_pairs
+            "screenshots": screenshots,
+            "step_files": step_files
         }
         
     except HTTPException:
@@ -760,118 +977,307 @@ def get_webvoyager_instance(instance_id: str):
         logger.error(f"Error querying WebVoyager instance {instance_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
-@app.get("/webvoyager/files/{file_id}")
-def get_webvoyager_file(file_id: int):
-    """Get a specific file from the WebVoyager dataset"""
+@app.get("/webvoyager/instances/{instance_id}/trajectory/{agent_id}")
+def get_webvoyager_trajectory(instance_id: str, agent_id: str):
+    """Get trajectory data for a specific agent in a WebVoyager instance"""
     if not db_conn:
         logger.error("Database connection not available")
         raise HTTPException(status_code=500, detail="Database connection not available")
     
     try:
-        # Create a new cursor for this request
         cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Get the file record
+        # Get trajectory points
         cursor.execute("""
-            SELECT id, filename, filepath, filetype 
-            FROM files 
-            WHERE id = %s
-        """, (file_id,))
+            SELECT timestamp, point_type, media_type, data_content, data_text, metadata, point_index, step_number
+            FROM webvoyager_trajectory_points 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY timestamp, point_index
+        """, (instance_id, agent_id))
         
-        file_record = cursor.fetchone()
+        trajectory_points = []
+        for row in cursor.fetchall():
+            point_data = dict(row)
+            
+            # Convert datetime to string for JSON serialization
+            if point_data['timestamp']:
+                point_data['timestamp'] = point_data['timestamp'].isoformat()
+            
+            # Parse JSONB fields
+            if point_data['data_content'] and isinstance(point_data['data_content'], str):
+                try:
+                    point_data['data_content'] = json.loads(point_data['data_content'])
+                except:
+                    pass
+            
+            if point_data['metadata'] and isinstance(point_data['metadata'], str):
+                try:
+                    point_data['metadata'] = json.loads(point_data['metadata'])
+                except:
+                    pass
+            
+            trajectory_points.append(point_data)
+        
         cursor.close()
         
-        if not file_record:
-            raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
+        return {
+            "instance_id": instance_id,
+            "agent_id": agent_id,
+            "trajectory_points": trajectory_points
+        }
         
-        # Fix the filepath by removing duplicate nnetnav_openweb_3 if present
-        filepath = file_record['filepath'].lstrip('/')
-        if filepath.startswith('nnetnav_openweb_3/nnetnav_openweb_3/'):
-            filepath = filepath.replace('nnetnav_openweb_3/nnetnav_openweb_3/', 'nnetnav_openweb_3/', 1)
+    except Exception as e:
+        logger.error(f"Error querying WebVoyager trajectory for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webvoyager/instances/{instance_id}/conversation")
+def get_webvoyager_conversation(instance_id: str):
+    """Get conversation data for a WebVoyager instance"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        # Construct the full path to the file
-        file_path = os.path.join(webvoyager_path.parent, filepath)
+        # Get instance data
+        cursor.execute("""
+            SELECT scenario FROM webvoyager_instances WHERE instance_id = %s
+        """, (instance_id,))
         
-        if not os.path.exists(file_path):
-            # Try an alternative path as fallback
-            alt_file_path = os.path.join(webvoyager_path, file_record['filepath'].lstrip('/'))
-            if not os.path.exists(alt_file_path):
-                logger.error(f"File not found on disk: {file_path} or {alt_file_path}")
-                raise HTTPException(status_code=404, detail=f"File not found on disk: {file_path}")
-            file_path = alt_file_path
+        instance_row = cursor.fetchone()
+        if not instance_row:
+            raise HTTPException(status_code=404, detail=f"Instance {instance_id} not found")
         
-        # Return the file
-        return FileResponse(
-            path=file_path,
-            filename=file_record['filename'],
-            media_type=file_record['filetype']
+        scenario = instance_row['scenario'] or ""
+        
+        # Get conversation (trajectory points that are actions)
+        cursor.execute("""
+            SELECT agent_id, timestamp, data_content, data_text, step_number
+            FROM webvoyager_trajectory_points 
+            WHERE instance_id = %s AND point_type = 'action'
+            ORDER BY timestamp
+        """, (instance_id,))
+        
+        conversation = []
+        for row in cursor.fetchall():
+            content = ""
+            
+            # Try to get content from data_text first, then data_content
+            if row['data_text']:
+                content = row['data_text']
+            elif row['data_content']:
+                if isinstance(row['data_content'], str):
+                    try:
+                        data_content = json.loads(row['data_content'])
+                        if isinstance(data_content, dict) and 'content' in data_content:
+                            content = str(data_content['content'])
+                        else:
+                            content = str(data_content)
+                    except:
+                        content = str(row['data_content'])
+                else:
+                    if isinstance(row['data_content'], dict) and 'content' in row['data_content']:
+                        content = str(row['data_content']['content'])
+                    else:
+                        content = str(row['data_content'])
+            
+            if content:
+                conversation.append({
+                    "agent_id": row['agent_id'],
+                    "timestamp": row['timestamp'].isoformat(),
+                    "content": content,
+                    "step_number": row['step_number']
+                })
+        
+        cursor.close()
+        
+        return {
+            "instance_id": instance_id,
+            "conversation": conversation,
+            "scenario": scenario
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error querying WebVoyager conversation for instance {instance_id}: {str(e)}", exc_info=True)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webvoyager/screenshots/{instance_id}/{step_number}")
+def get_webvoyager_screenshot(instance_id: str, step_number: int):
+    """Get a specific screenshot for a WebVoyager instance and step"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT screenshot_data, file_size FROM webvoyager_screenshots 
+            WHERE instance_id = %s AND step_number = %s
+        """, (instance_id, step_number))
+        
+        screenshot_row = cursor.fetchone()
+        cursor.close()
+        
+        if not screenshot_row:
+            raise HTTPException(status_code=404, detail=f"Screenshot not found for instance {instance_id}, step {step_number}")
+        
+        # Return the screenshot as a file response
+        return Response(
+            content=screenshot_row['screenshot_data'],
+            media_type="image/png",
+            headers={"Content-Disposition": f"attachment; filename=screenshot_step_{step_number}.png"}
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving file {file_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error retrieving file: {str(e)}")
+        logger.error(f"Error retrieving screenshot for instance {instance_id}, step {step_number}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving screenshot: {str(e)}")
+
+@app.get("/webvoyager/step_files/{instance_id}/{step_number}")
+def get_webvoyager_step_file(instance_id: str, step_number: int):
+    """Get a specific step file for a WebVoyager instance and step"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
     
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT step_data, file_size FROM webvoyager_step_files 
+            WHERE instance_id = %s AND step_number = %s
+        """, (instance_id, step_number))
+        
+        step_row = cursor.fetchone()
+        cursor.close()
+        
+        if not step_row:
+            raise HTTPException(status_code=404, detail=f"Step file not found for instance {instance_id}, step {step_number}")
+        
+        # Return the step file as a file response
+        return Response(
+            content=step_row['step_data'],
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename=step_{step_number}.pkl.gz"}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving step file for instance {instance_id}, step {step_number}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving step file: {str(e)}")
+
 @app.get("/webvoyager/instances/{instance_id}/metrics/{agent_id}")
 async def get_webvoyager_instance_agent_metrics(instance_id: str, agent_id: str):
-    """Get metrics for a specific WebVoyager instance (agent_id must be 'agent')."""
-    logger.info(f"Attempting to get WebVoyager metrics for instance='{instance_id}', agent='{agent_id}'")
-
-    # --- Validate requested agent_id ---
-    if agent_id != "agent":
-        logger.warning(f"Invalid agent_id '{agent_id}' requested for WebVoyager instance '{instance_id}'. Only 'agent' is supported.")
-        raise HTTPException(status_code=400, detail="Invalid agent_id for WebVoyager. Only 'agent' is supported.")
-    # --- End Validation ---
-
-    if not webvoyager_metrics_file.exists():
-        logger.warning(f"WebVoyager metrics file not found at {webvoyager_metrics_file} for instance {instance_id}, agent {agent_id}")
-        raise HTTPException(status_code=404, detail="WebVoyager metrics file not found")
-
+    """Get metrics for a specific WebVoyager instance and agent from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
     try:
-        line_number = 0
-        with open(webarena_metrics_file, "r") as f:
-            for line in f:
-                line_number += 1
-                try:
-                    metric_data = json.loads(line)
-                    file_instance_id = metric_data.get("instance_id")
-                    # --- Check agent_id in file ---
-                    file_agent_id = metric_data.get("agent_id")
-                    if file_agent_id != "agent":
-                        # Silently skip lines with incorrect agent_id in the file
-                        continue
-                    # --- End Check ---
-
-                    logger.debug(f"Line {line_number}: Comparing Request(instance='{instance_id}') with File(instance='{file_instance_id}', agent='{file_agent_id}')")
-                    ids_match = file_instance_id == instance_id
-                    # agents_match is implicitly true if we reach here, as both request and file agent_id must be 'agent'
-                    logger.debug(f"Line {line_number}: Instance match: {ids_match}")
-
-                    if ids_match: # Only need to check instance ID now
-                        logger.info(f"Found WebArena match on line {line_number} for instance='{instance_id}', agent='agent'")
-                        response_data = {}
-                        for key, value in metric_data.items():
-                             if isinstance(value, (int, float)) or (key.endswith("_reasoning") and isinstance(value, str)):
-                                 response_data[key] = value
-                        # Return the validated agent_id from the request
-                        response_data["instance_id"] = instance_id
-                        response_data["agent_id"] = agent_id # Should always be 'agent'
-                        return response_data
-                except json.JSONDecodeError:
-                    logger.error(f"Error parsing JSON on line {line_number} in WebArena metrics file: {line.strip()}")
-                    continue
-                except Exception as e: # Catch other potential errors per line
-                    logger.error(f"Error processing line {line_number} in WebArena metrics file: {line.strip()} - {e}")
-                    continue
-
-        # If loop finishes without finding a match for the instance_id with agent_id='agent'
-        logger.warning(f"WebArena metrics search completed. No match found for instance {instance_id} (with agent_id='agent') after checking {line_number} lines.")
-        raise HTTPException(status_code=404, detail="Metrics not found for this WebArena instance with agent_id='agent'")
-
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT metric_name, metric_value, reasoning
+            FROM webvoyager_metrics 
+            WHERE instance_id = %s AND agent_id = %s
+            ORDER BY metric_name
+        """, (instance_id, agent_id))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        if not results:
+            raise HTTPException(status_code=404, detail="Metrics not found for this instance/agent combination")
+        
+        # Format the response to match the original API
+        response_data = {
+            "instance_id": instance_id,
+            "agent_id": agent_id
+        }
+        
+        for row in results:
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            response_data[metric_name] = metric_value
+            if reasoning:
+                response_data[f"{metric_name}_reasoning"] = reasoning
+        
+        return response_data
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error reading WebArena metrics file for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error reading WebArena metrics")
+        logger.error(f"Error querying WebVoyager metrics for instance {instance_id}, agent {agent_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+@app.get("/webvoyager/metrics/instances")
+def get_webvoyager_metrics_by_instance():
+    """Get a mapping of instance IDs to their available metrics from the database"""
+    if not db_conn:
+        logger.error("Database connection not available")
+        raise HTTPException(status_code=500, detail="Database connection not available")
+    
+    try:
+        cursor = db_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        cursor.execute("""
+            SELECT instance_id, agent_id, metric_name, metric_value, reasoning
+            FROM webvoyager_metrics 
+            ORDER BY instance_id, agent_id, metric_name
+        """)
+        
+        results = cursor.fetchall()
+        cursor.close()
+        
+        # Create a mapping of instance_id -> agent_id -> metrics
+        instance_metrics = {}
+        
+        for row in results:
+            instance_id = row['instance_id']
+            agent_id = row['agent_id']
+            metric_name = row['metric_name']
+            metric_value = row['metric_value']
+            reasoning = row['reasoning']
+            
+            # Initialize the instance entry if it doesn't exist
+            if instance_id not in instance_metrics:
+                instance_metrics[instance_id] = {}
+            
+            # Initialize the agent entry if it doesn't exist
+            if agent_id not in instance_metrics[instance_id]:
+                instance_metrics[instance_id][agent_id] = {
+                    "metrics": {},
+                    "reasoning": {}
+                }
+            
+            # Add metric and reasoning
+            instance_metrics[instance_id][agent_id]["metrics"][metric_name] = metric_value
+            if reasoning:
+                instance_metrics[instance_id][agent_id]["reasoning"][metric_name] = reasoning
+        
+        return instance_metrics
+        
+    except Exception as e:
+        logger.error(f"Error querying WebVoyager metrics by instance: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
 # --- NEW DATABASE-BACKED SOTOPIA ENDPOINTS ---
 
@@ -994,17 +1400,19 @@ def get_sotopia_instance(instance_id: str):
             agent_data = dict(agent_row)
             
             # Parse JSONB fields
-            if agent_data['capabilities'] and isinstance(agent_data['capabilities'], str):
-                try:
-                    agent_data['capabilities'] = json.loads(agent_data['capabilities'])
-                except:
-                    pass
+            if agent_data['capabilities'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['capabilities'], dict):
+                    agent_data['capabilities'] = {}
+            else:
+                agent_data['capabilities'] = {}
             
-            if agent_data['parameters'] and isinstance(agent_data['parameters'], str):
-                try:
-                    agent_data['parameters'] = json.loads(agent_data['parameters'])
-                except:
-                    pass
+            if agent_data['parameters'] is not None:
+                # JSONB fields are already parsed as Python objects by psycopg2
+                if not isinstance(agent_data['parameters'], dict):
+                    agent_data['parameters'] = {}
+            else:
+                agent_data['parameters'] = {}
             
             agents.append(agent_data)
         
