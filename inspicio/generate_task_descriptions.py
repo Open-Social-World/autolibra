@@ -6,6 +6,7 @@ import pandas as pd
 from pathlib import Path
 from openai import OpenAI
 import logging
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(
@@ -30,7 +31,7 @@ cursor = conn.cursor()
 
 BASE_DIR = os.path.join(os.getcwd(),".data", "webvoyager-nnetnav-openweb-3")
 
-def ensure_description_column():
+def ensure_description_column() -> None:
     cursor.execute("""
     SELECT column_name 
     FROM information_schema.columns 
@@ -68,16 +69,18 @@ def generate_label(log_content: str) -> str:
             n=1,
             stop=None,
         )
-        description = response.choices[0].message.content.strip().strip('"')
-        description = re.sub(r'^["\']|["\']$', '', description)
-
-        return description
+        description = response.choices[0].message.content
+        if description is not None:
+            description = description.strip().strip('"')
+            description = re.sub(r'^["\']|["\']$', '', description)
+            return description
+        return "Unknown Task"
     
     except Exception as e:
         logging.error(f"Error generating task description: {e}")
         return "Unknown Task"
 
-def update_task_descriptions():
+def update_task_descriptions() -> None:
     ensure_description_column()
     
     cursor.execute("""
