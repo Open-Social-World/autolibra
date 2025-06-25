@@ -269,7 +269,7 @@ const CommentSystem: React.FC<CommentSystemProps> = ({
       a.selection.startOffset - b.selection.startOffset // Sort ascending for sequential processing
     );
 
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
 
     sortedComments.forEach(comment => {
@@ -447,7 +447,22 @@ const CommentSystem: React.FC<CommentSystemProps> = ({
                   <div className="mb-2">
                     {editingComment === comment.id ? (
                       <div className="mt-1">
-                        <textarea defaultValue={comment.text} className="w-full p-2 border rounded text-sm" rows={3} autoFocus onClick={(e) => e.stopPropagation()} onBlur={(e) => updateComment(comment.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); updateComment(comment.id, e.target.value); } else if (e.key === 'Escape') { setEditingComment(null); } }} />
+                        <textarea
+                          defaultValue={comment.text}
+                          className="w-full p-2 border rounded text-sm"
+                          rows={3}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          onBlur={(e) => updateComment(comment.id, (e.target as HTMLTextAreaElement).value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              updateComment(comment.id, (e.target as HTMLTextAreaElement).value);
+                            } else if (e.key === 'Escape') {
+                              setEditingComment(null);
+                            }
+                          }}
+                        />
                       </div>
                     ) : ( <p className="text-sm whitespace-pre-wrap">{comment.text}</p> )}
                   </div>

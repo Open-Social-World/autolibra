@@ -1,22 +1,21 @@
 FROM python:3.11-slim
 
-# Set working directory
-WORKDIR /app
+WORKDIR /osw-eval
 
-# Copy the backend directory
-COPY inspicio_backend/ ./
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the required osw_data package
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+
 COPY packages/ ./packages/
+COPY inspicio_backend/ ./inspicio_backend/
 
-# Copy required data directories
-COPY .data/ ./.data/
 
-# Install dependencies
-RUN pip install fastapi uvicorn[standard] psycopg2-binary pydantic
+RUN pip install -e ./packages/osw-data/
 
-# Expose the port Railway will use
 EXPOSE 8000
 
-# Run the server
-CMD ["python", "server.py"]
+CMD ["python", "inspicio_backend/server.py"]

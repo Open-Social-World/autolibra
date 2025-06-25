@@ -1,0 +1,24 @@
+{
+    "services": [
+    {
+      "name": "frontend",
+      "root": "inspicio",
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "cd inspicio && npm run dev"
+      }
+    },
+    {
+      "name": "backend",
+      "root": "inspicio_backend",
+      "build": {
+        "builder": "NIXPACKS"
+      },
+      "deploy": {
+        "startCommand": "python inspicio_backend/server.py"
+      }
+    }
+  ]
+}

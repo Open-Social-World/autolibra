@@ -10,7 +10,6 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
-# Add the package directory to the Python path
 sys.path.append(str(Path(__file__).parent.parent.parent / "packages"))
 
 from osw_data.dataset import MultiAgentDataset

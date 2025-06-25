@@ -19,9 +19,6 @@ load_dotenv()
 
 from osw_data.dataset import MultiAgentDataset
 from osw_data.trajectory import PointType
-from osw_data.annotation import AnnotationSystem, AnnotationSpan
-
-base_annotation_path = Path(__file__).parent.parent.parent / ".data" / "annotations"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,14 +49,6 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
-
-# Function to get annotation system for a specific dataset
-def get_annotation_system(dataset: str) -> Optional[AnnotationSystem]:
-    """Get the annotation system for a specific dataset"""
-    if dataset not in annotation_systems:
-        logger.error(f"Annotation system not found for dataset: {dataset}")
-        return None
-    return annotation_systems[dataset]
 
 def save_annotation_to_db(dataset: str, annotation_id: str, instance_id: str, agent_id: str, 
                          annotator_id: str, content: dict, created_at: datetime, 
@@ -151,8 +140,8 @@ def save_annotation_to_db(dataset: str, annotation_id: str, instance_id: str, ag
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize dataset, load labels, and initialize annotation system
-    global dataset, instance_labels, metric_set, annotation_systems, webarena_instance_labels, webarena_dataset, db_conn
+    # Startup: Initialize database connection
+    global db_conn
     
     # Initialize database connection
     try:
@@ -161,43 +150,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize database connection: {e}", exc_info=True)
         db_conn = None
-    
-    # Initialize Annotation Systems for each dataset
-    annotation_systems = {}
-    supported_datasets = ["sotopia", "webarena", "webvoyager"]
-    
-    for dataset_name in supported_datasets:
-        try:
-            # Create dataset-specific annotation path
-            dataset_annotation_path = base_annotation_path / dataset_name
-            
-            # Ensure the annotation directory exists
-            dataset_annotation_path.mkdir(parents=True, exist_ok=True)
-            
-            annotation_system = AnnotationSystem(
-                base_path=dataset_annotation_path,
-                project_name=f"{dataset_name.title()} Web Annotation",
-                description=f"Annotations added via the web interface for {dataset_name}.",
-                annotation_schema={
-                    "comment": {
-                        "type": "object",
-                        "properties": {
-                            "comment_text": {"type": "string"},
-                            "selection_text": {"type": "string"},
-                            "start_offset": {"type": "integer"},
-                            "end_offset": {"type": "integer"},
-                        },
-                        "required": ["comment_text", "selection_text", "start_offset", "end_offset"],
-                        "description": "A comment linked to a text selection.",
-                    }
-                },
-            )
-            annotation_systems[dataset_name] = annotation_system
-            logger.info(f"Annotation system initialized for {dataset_name} at {dataset_annotation_path}")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize AnnotationSystem for {dataset_name}: {str(e)}", exc_info=True)
-            annotation_systems[dataset_name] = None
 
     yield
     
@@ -232,26 +184,14 @@ def read_root():
 # --- NEW ANNOTATION ENDPOINT ---
 @app.post("/annotations")
 async def create_annotation(payload: AnnotationPayload):
-    """Receive and save a new annotation."""
+    """Receive and save a new annotation to the database."""
     logger.info(f"Received annotation payload: {payload.dict()}")
 
-    # Get the appropriate annotation system for the dataset
-    annotation_system = get_annotation_system(payload.dataset)
-    if not annotation_system:
-        logger.error(f"Annotation system not available for dataset: {payload.dataset}")
-        raise HTTPException(status_code=500, detail=f"Annotation system not available for dataset: {payload.dataset}")
-
-    # Ensure annotator exists in the system
-    if payload.annotator_id not in annotation_system.project.annotators:
-        try:
-            annotation_system.add_annotator(
-                annotator_id=payload.annotator_id,
-                name=payload.annotator_id, # Use ID as name for simplicity
-            )
-            logger.info(f"Added new annotator: {payload.annotator_id}")
-        except Exception as e:
-            logger.error(f"Failed to add annotator {payload.annotator_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to add annotator: {str(e)}")
+    # Validate dataset
+    supported_datasets = ["sotopia", "webarena", "webvoyager"]
+    if payload.dataset not in supported_datasets:
+        logger.error(f"Unsupported dataset: {payload.dataset}")
+        raise HTTPException(status_code=400, detail=f"Unsupported dataset: {payload.dataset}. Supported datasets: {supported_datasets}")
 
     try:
         # Prepare the content based on the schema
@@ -264,44 +204,28 @@ async def create_annotation(payload: AnnotationPayload):
             }
         }
 
-        # Add the annotation to the file system
-        # We don't have a precise time span from the frontend comment system,
-        # so we'll use the current time as a point annotation (start=end).
-        # Alternatively, omit the span if your workflow allows.
+        # Generate a unique annotation ID
         current_time = datetime.now()
-        annotation = annotation_system.add_annotation(
+        annotation_id = f"{payload.dataset}_{payload.instance_id}_{payload.agent_id}_{payload.annotator_id}_{current_time.strftime('%Y%m%d_%H%M%S_%f')}"
+
+        # Save the annotation to the database
+        save_annotation_to_db(
+            dataset=payload.dataset,
+            annotation_id=annotation_id,
             instance_id=payload.instance_id,
             agent_id=payload.agent_id,
             annotator_id=payload.annotator_id,
             content=annotation_content,
-            span=AnnotationSpan(start_time=current_time, end_time=current_time), # Point-in-time span
-            # span=None # Or omit span if not strictly needed here
+            created_at=current_time,
+            updated_at=current_time,
+            start_time=current_time,  # Use current time as point annotation
+            end_time=current_time,    # Use current time as point annotation
+            confidence=None,
+            metadata={"source": "web_interface"}
         )
 
-        # Also save the annotation to the database
-        try:
-            save_annotation_to_db(
-                dataset=payload.dataset,
-                annotation_id=annotation.annotation_id,
-                instance_id=payload.instance_id,
-                agent_id=payload.agent_id,
-                annotator_id=payload.annotator_id,
-                content=annotation_content,
-                created_at=annotation.created_at,
-                updated_at=annotation.updated_at,
-                start_time=annotation.span.start_time if annotation.span else None,
-                end_time=annotation.span.end_time if annotation.span else None,
-                confidence=annotation.confidence,
-                metadata=annotation.metadata
-            )
-            logger.info(f"Annotation also saved to database for dataset {payload.dataset}")
-        except Exception as db_error:
-            logger.error(f"Failed to save annotation to database: {str(db_error)}")
-            # Don't fail the entire request if database save fails, but log the error
-            # The annotation is still saved to the file system
-
-        logger.info(f"Annotation saved successfully for dataset {payload.dataset}, instance {payload.instance_id}, agent {payload.agent_id}")
-        return {"message": "Annotation saved successfully"}
+        logger.info(f"Annotation saved successfully to database for dataset {payload.dataset}, instance {payload.instance_id}, agent {payload.agent_id}")
+        return {"message": "Annotation saved successfully", "annotation_id": annotation_id}
 
     except Exception as e:
         logger.error(f"Failed to save annotation: {str(e)}", exc_info=True)

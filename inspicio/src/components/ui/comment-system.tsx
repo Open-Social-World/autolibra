@@ -134,22 +134,19 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
   }, [selection]);
 
   const renderHighlightedText = () => {
-    const sourceText = initialText;
-    if (!sourceText) return <div ref={textRef} onMouseUp={handleTextSelection} className="relative p-4 border rounded text-gray-800 leading-relaxed whitespace-pre-wrap"></div>;
+    if (!initialText) return null;
 
-    const sortedComments = [...comments].sort((a, b) =>
-      a.selection.startOffset - b.selection.startOffset
-    );
-
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let currentIndex = 0;
 
-    sortedComments.forEach(comment => {
+    comments.forEach(comment => {
+      if (!comment.selection) return;
+
       const { startOffset, endOffset } = comment.selection;
 
-      if (startOffset >= currentIndex && endOffset >= startOffset && endOffset <= sourceText.length) {
+      if (startOffset >= currentIndex && endOffset >= startOffset && endOffset <= initialText.length) {
         if (startOffset > currentIndex) {
-          parts.push(sourceText.substring(currentIndex, startOffset));
+          parts.push(initialText.substring(currentIndex, startOffset));
         }
 
         parts.push(
@@ -161,7 +158,7 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
               handleHighlightClick(comment.id);
             }}
           >
-            {sourceText.substring(startOffset, endOffset)}
+            {initialText.substring(startOffset, endOffset)}
           </span>
         );
 
@@ -169,8 +166,8 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
       }
     });
 
-    if (currentIndex < sourceText.length) {
-      parts.push(sourceText.substring(currentIndex));
+    if (currentIndex < initialText.length) {
+      parts.push(initialText.substring(currentIndex));
     }
 
     return (
@@ -273,7 +270,10 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
 
           <div className="p-4 space-y-4">
             {comments.length === 0 ? (
-               {/* ... no comments message ... */}
+              <div className="text-center text-gray-500 py-8">
+                <MessageSquare className="mx-auto h-8 w-8 mb-2" />
+                <p>No comments yet</p>
+              </div>
             ) : (
               comments.map(comment => (
                 <div
@@ -295,11 +295,11 @@ const CommentSystem: React.FC<CommentSystemProps> = ({ initialText, isLoading = 
                       <div className="mt-1">
                         <textarea
                           defaultValue={comment.text}
-                          onBlur={(e) => updateComment(comment.id, e.target.value)}
+                          onBlur={(e) => updateComment(comment.id, (e.target as HTMLTextAreaElement).value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              updateComment(comment.id, e.target.value);
+                              updateComment(comment.id, (e.target as HTMLTextAreaElement).value);
                             } else if (e.key === 'Escape') {
                                 setEditingComment(null);
                             }

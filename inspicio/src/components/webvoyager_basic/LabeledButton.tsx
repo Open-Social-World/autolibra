@@ -1,13 +1,14 @@
 import React from 'react';
-import { Button } from "@/components/ui/button"; // Use button from webarena_ui
+import { Button } from "../ui/button";
 import { Users, Calendar } from 'lucide-react'; // Keep icons
-import { cn } from '@/lib/utils'; // Keep utility
+import { cn } from '../../lib/utils'; // Keep utility
 
 interface LabeledButtonProps {
   id: string;
   topic: string; 
   agents?: string; 
   date?: string;  
+  isSelected?: boolean;
   onClick: (id: string) => void;
 }
 

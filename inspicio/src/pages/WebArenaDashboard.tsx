@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "../components/ui/button"; 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ScrollArea } from "../components/ui/scroll-area";   
@@ -9,7 +9,6 @@ import { MessageSquare, Users, Calendar, TrendingUp } from 'lucide-react';
 import { LabeledButton } from "../components/webarena_ui/LabeledButton"; // Updated path
 import MetricSidebar from "../components/webarena_ui/MetricSidebar"; // Updated path
 import webarenaLogo from "../assets/WebArenaMascot.png"; // Assuming a webarena logo exists
-import { useNavigate } from "react-router-dom";
 import TrajectorySearchBar from "../components/webarena_ui/trajectory-searchbar"; // Updated path
 import CommentSystem from "../components/webarena_ui/comment-system"; // Updated path
 import {
@@ -30,7 +29,6 @@ import {
 } from "../components/ui/hover-card"; 
 import { SidebarProvider } from "../components/ui/sidebar";
 import { AppSidebar } from "../components/sidebar";
-
 
 // Interface matches /webarena/trajectories output
 interface Label {
@@ -60,14 +58,6 @@ interface ConversationData {
   scenario?: string; // Matches backend key
 }
 
-// Add type for LabeledButton props
-interface LabeledButtonProps {
-  id: string;
-  topic: string;
-  selected?: boolean;
-  onClick: (id: string) => void;
-}
-
 function WebArenaDashboard() {
   const [labels, setLabels] = useState<Label[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
@@ -75,7 +65,6 @@ function WebArenaDashboard() {
   const [loading, setLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [scenario, setScenario] = useState<string>(""); // Holds the goal/task description
-  const navigate = useNavigate();
 
   const [searchResults, setSearchResults] = useState<Label[]>([]);
   const [trajectoryRefs, setTrajectoryRefs] = useState<{ [key: string]: React.RefObject<HTMLDivElement> }>({});

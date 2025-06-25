@@ -1,15 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from "react";
-import { Button } from "../components/ui/button"; 
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ScrollArea } from "../components/ui/scroll-area";   
 import { Separator } from "../components/ui/separator"; 
 import { Skeleton } from "../components/ui/skeleton";
 import { Header } from "../components/Header"; 
-import { MessageSquare, Users, Calendar, TrendingUp, Search, ExternalLink } from 'lucide-react';
+import { MessageSquare, Users, Calendar, TrendingUp, ExternalLink } from 'lucide-react';
 import { LabeledButton } from "../components/webvoyager_ui/LabeledButton";
 import MetricSidebar from "../components/webvoyager_ui/MetricSidebar"; 
 import webvoyagerLogo from "../assets/WebVoyagerLogo.png"; 
-import { useNavigate } from "react-router-dom";
 import TrajectorySearchBar from "../components/webvoyager_ui/trajectory-searchbar";
 import {
   Command,
@@ -19,14 +17,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
-  CommandShortcut,
 } from "../components/ui/command"; 
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "../components/ui/hover-card"; 
 import {
   Carousel,
   CarouselContent,
@@ -38,7 +29,6 @@ import {
 import CommentSystem from "../components/webvoyager_ui/comment-system";
 import { SidebarProvider } from "../components/ui/sidebar";
 import { AppSidebar } from "../components/sidebar";
-
 
 // Interface for mock instances from the database
 interface MockInstance {
@@ -89,20 +79,6 @@ interface InstanceDetails {
   step_files: StepFileData[];
 }
 
-// Add a new interface for screenshot-log pairs
-interface ScreenshotLogPair {
-  step_number: number;
-  log_segment: string;
-}
-
-// Update LabeledButton props interface to match component
-interface LabeledButtonProps {
-  id: string;
-  topic: string;
-  selected?: boolean;
-  onClick: (id: string) => void;
-}
-
 // Add missing TrajectorySummary interface
 interface TrajectorySummary {
   id: string;
@@ -130,35 +106,21 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
-// Format conversation to string function
-const formatConversationToString = (conv: ConversationEntry[]): string => {
-  if (!conv || conv.length === 0) return "";
-  return conv.map(entry => {
-    const cleanContent = entry.content.replace(/^said:\s*/, '');
-    return `[${formatTimestamp(entry.timestamp)}] ${entry.agent_id}:\n${cleanContent}`;
-  }).join("\n\n---\n\n");
-};
-
 function WebVoyagerDashboard() {
   const [instances, setInstances] = useState<MockInstance[]>([]);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [instanceDetails, setInstanceDetails] = useState<InstanceDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
   const [currentLogSegment, setCurrentLogSegment] = useState<string>("");
 
   // Add state for carousel API
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Add missing trajectoryRefs state
-  const [trajectoryRefs] = useState<{ [key: string]: React.RefObject<HTMLDivElement> }>({});
 
   useEffect(() => {
     async function fetchInstances() {
@@ -237,11 +199,6 @@ function WebVoyagerDashboard() {
     }
   }
 
-  // Function to handle instance selection
-  const handleInstanceClick = (instanceId: string) => {
-    fetchInstanceDetails(instanceId);
-  };
-
   // Function to format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
@@ -314,7 +271,7 @@ function WebVoyagerDashboard() {
                   ) : (
                     <div className="space-y-2 p-1">
                       {instances.map((instance) => (
-                        <div ref={trajectoryRefs[instance.instance_id]} key={instance.instance_id}>
+                        <div key={instance.instance_id}>
                           <LabeledButton
                             id={instance.instance_id}
                             topic={instance.label}

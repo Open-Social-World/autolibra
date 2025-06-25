@@ -1,32 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "../components/ui/button"; 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ScrollArea } from "../components/ui/scroll-area";   
 import { Separator } from "../components/ui/separator"; 
 import { Skeleton } from "../components/ui/skeleton";
 import { Header } from "../components/Header"; 
-import { MessageSquare, Users, Calendar, TrendingUp, Search, ExternalLink } from 'lucide-react';
+import { MessageSquare, Calendar, TrendingUp, ExternalLink, Search } from 'lucide-react';
 import { LabeledButton } from "../components/webvoyager_ui/LabeledButton";
-import MetricSidebar from "../components/webvoyager_ui/MetricSidebar"; 
 import webvoyagerLogo from "../assets/WebVoyagerLogo.png"; 
-import { useNavigate } from "react-router-dom";
-import TrajectorySearchBar from "../components/webvoyager_ui/trajectory-searchbar";
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-  CommandShortcut,
-} from "../components/ui/command"; 
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "../components/ui/hover-card"; 
 import {
   Carousel,
   CarouselContent,
@@ -35,7 +16,6 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "../components/ui/carousel";
-
 
 // Interface for mock instances from the database
 interface MockInstance {
@@ -98,7 +78,6 @@ function WebVoyagerDashboard() {
   const [instanceDetails, setInstanceDetails] = useState<InstanceDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -210,27 +189,6 @@ function WebVoyagerDashboard() {
         subtitle1Icon={<MessageSquare className="mr-1.5 h-4 w-4 text-muted-foreground" />}
         subtitle2Icon={<Calendar className="mr-1.5 h-4 w-4 text-muted-foreground" />}
       />
-
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search experiments by description..." />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Experiments">
-            {instances.map((instance) => (
-              <CommandItem
-                key={instance.instance_id}
-                value={`${instance.instance_id} ${instance.label}`}
-                onSelect={() => {
-                  fetchInstanceDetails(instance.instance_id);
-                  setOpen(false);
-                }}
-              >
-                {instance.label || instance.instance_id}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         <div className="md:col-span-3">
