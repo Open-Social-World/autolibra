@@ -11,7 +11,7 @@ AutoLibra is designed to facilitate the evaluation of agents through metrics der
 Install git lfs if you haven't already. This is required to download the large files in the dataset.
 
 #### From scratch
-For contributors, it is the best to use our shared data repo on huggingface: `open-social-world/autolibra`. Upload new datasets to this shared repo.
+For contributors, it is the best to use our shared data repo on Hugging Face: `open-social-world/autolibra`. Upload new datasets to this shared repo.
 
 ```bash
 # Download and preprocess <dataset>
