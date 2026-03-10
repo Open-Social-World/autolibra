@@ -1,0 +1,9 @@
+# Keep prompt optimization structure in Git, but exclude generated turn artifacts.
+repos/*/*/turns/turn_*/info/**
+repos/*/*/turns/turn_*/output/*.py
+repos/*/*/turns/turn_*/output/*.json
+repos/*/*/turns/turn_*/output/*.jsonl
+repos/*/*/turns/turn_*/output/*.txt
+repos/*/*/turns/turn_*/output/*.md
+repos/*/*/turns/turn_*/output/for_evaluation/**
+
