@@ -68,7 +68,9 @@ def analyze_all_results(file_paths: List[str], output_csv: str) -> None:
                 try:
                     result = json.loads(line.strip())
                     for field_name, field_value in result.items():
-                        if isinstance(field_value, int) and not field_name.endswith("_reasoning"):
+                        if isinstance(field_value, int) and not field_name.endswith(
+                            "_reasoning"
+                        ):
                             file_metrics[field_name].append(field_value)
                             all_metrics.add(field_name)
                 except json.JSONDecodeError as exc:
