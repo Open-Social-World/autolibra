@@ -6,4 +6,3 @@ repos/*/*/turns/turn_*/output/*.jsonl
 repos/*/*/turns/turn_*/output/*.txt
 repos/*/*/turns/turn_*/output/*.md
 repos/*/*/turns/turn_*/output/for_evaluation/**
-

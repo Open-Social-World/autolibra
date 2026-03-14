@@ -118,7 +118,7 @@ class BalrogConverter(BaseConverter):
 
                 # Increase CSV field size limit to handle large text fields
                 csv.field_size_limit(1000000)  # Set to 1MB limit
-                
+
                 with open(traj_file, newline="") as f:
                     reader = csv.reader(f, quotechar='"', quoting=csv.QUOTE_MINIMAL)
                     # Skip header
@@ -177,10 +177,12 @@ if __name__ == "__main__":
     )
 
     filename = parser.parse_args().filename
-    
+
     # Extract the task name (last 5 words from the full path)
     full_path = Path(filename)
-    task_name = '_'.join(full_path.name.split('_')[-5:])  # e.g., robust_cot_Qwen_Qwen3-32B
+    task_name = "_".join(
+        full_path.name.split("_")[-5:]
+    )  # e.g., robust_cot_Qwen_Qwen3-32B
 
     source_path = Path(f".data/raw/{filename}")  # Full source path
     output_path = Path(f".data/{filename}")  # Output path with task name

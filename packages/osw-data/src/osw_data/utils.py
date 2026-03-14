@@ -112,10 +112,10 @@ def file_pairs_list(folder_path: Path) -> list[tuple[Path, Path]]:
         json_file = csv_file.with_suffix(".json")
         if json_file.exists():
             valid_pairs.append((csv_file, json_file))
-    
+
     if not valid_pairs:
         raise FileNotFoundError(f"No valid CSV-JSON file pairs found in {folder_path}")
-    
+
     return valid_pairs
 
 
