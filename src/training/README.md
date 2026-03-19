@@ -39,6 +39,13 @@ This document explains key scripts in `src/training` and how they fit into the A
 3. `coverage_analysis_gemini.py` (optional but recommended for diagnostics)
 4. `prompt_improver_direct_data.py` (uses metrics/eval outputs/trajectories)
 
+## Behavior Clustering Template Notes
+
+- Keep `packages/autolibra-core/src/autolibra_core/templates/behavior_clustering.j2` in a clean baseline state (for example: `Output 4 metrics.`).
+- Both `grounding_gemini.py` and `grounding_gemini_induction.py` may temporarily rewrite this template at runtime to enforce metric counts.
+- Induction may add stricter anti-duplication prompt text at runtime when existing metrics are loaded.
+- If a run is interrupted, backup files like `behavior_clustering.j2.backup_*` can be left behind; these should not be committed.
+
 ## Prompt Improver (`prompt_improver_direct_data.py`)
 
 ### What it does
