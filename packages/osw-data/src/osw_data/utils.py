@@ -101,21 +101,22 @@ def file_pairs_list(folder_path: Path) -> list[tuple[Path, Path]]:
     Args:
         folder_path: Path to the folder to search in
 
-    Yields:
-        Tuple of (csv_path, json_path) for matching files
+    Returns:
+        List of (csv_path, json_path) tuples for matching files
     """
     path = folder_path
-
-    json_folder = []
+    valid_pairs = []
 
     # Find all CSV files and check for JSON pairs
     for csv_file in path.rglob("*.csv"):
         json_file = csv_file.with_suffix(".json")
-        json_folder.append((csv_file, json_file))
-    if json_file.exists():
-        return json_folder
-    else:
-        raise FileNotFoundError(f"JSON file not found for {csv_file}")
+        if json_file.exists():
+            valid_pairs.append((csv_file, json_file))
+
+    if not valid_pairs:
+        raise FileNotFoundError(f"No valid CSV-JSON file pairs found in {folder_path}")
+
+    return valid_pairs
 
 
 def file_triplets(folder_path: str) -> Generator[Tuple[Path, Path, Path], None, None]:

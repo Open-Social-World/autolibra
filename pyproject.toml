@@ -19,6 +19,8 @@ dependencies = [
     "pandas>=2.2",
     "logfire>=3.7.1",
     "matplotlib>=3.10.1",
+    "google-generativeai>=0.8.5",
+    "google-genai>=1.27.0",
 ]
 
 [tool.uv]

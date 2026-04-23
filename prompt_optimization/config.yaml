@@ -1,0 +1,19 @@
+active:
+  repo: balrog
+  game: babaisai
+
+provider:
+  name: gemini
+  azure_model: null
+
+naming:
+  agent_prefix: Babaisai
+  agent_filename_template: "{agent_prefix_lower}_{agent_number}.py"
+
+paths:
+  base_dir: prompt_optimization
+  turn_info_dir_template: "{base_dir}/repos/{repo}/{game}/turns/turn_{turn}/info"
+  turns_dir: "{base_dir}/repos/{repo}/{game}/turns"
+  turn_output_dir_template: "{base_dir}/repos/{repo}/{game}/turns/turn_{turn}/output"
+  seed_agent_path: "{base_dir}/repos/{repo}/{game}/prompt_seed/agent.py"
+  rules_path: "{base_dir}/repos/{repo}/{game}/rules.md"
