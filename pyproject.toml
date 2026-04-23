@@ -48,6 +48,19 @@ members = ["packages/*"]
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "stubs"
+# Exclude vendored external code and untyped exploratory scripts.
+# Strict type checking still applies to packages/* (the installable library code)
+# and the rest of src/.
+exclude = [
+    "^prompt_optimization/",
+    "^src/training/coverage_analysis_gemini\\.py$",
+    "^src/training/llm_eval_gemini\\.py$",
+    "^src/training/llm_as_a_judge_gemini\\.py$",
+    "^src/training/gemini_batch_pipeline\\.py$",
+    "^src/training/grounding_gemini\\.py$",
+    "^src/training/grounding_gemini_induction\\.py$",
+    "^src/training/prompt_improver_direct_data\\.py$",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/osw_data"]

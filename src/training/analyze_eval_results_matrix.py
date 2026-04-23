@@ -130,18 +130,18 @@ def main() -> None:
     args = parser.parse_args()
     search_path = Path(args.dir)
 
-    file_paths = list(search_path.glob(args.pattern))
+    file_paths: list[Path] = list(search_path.glob(args.pattern))
     eval_results_dir = search_path / "eval_results"
     if eval_results_dir.exists():
         file_paths.extend(eval_results_dir.glob(args.pattern))
 
-    file_paths = sorted(set(str(path) for path in file_paths))
-    if not file_paths:
+    file_path_strs = sorted({str(path) for path in file_paths})
+    if not file_path_strs:
         print(f"No files found for pattern: {args.pattern}")
         print(f"Searched: {search_path} and {eval_results_dir}")
         return
 
-    analyze_all_results(file_paths, args.output)
+    analyze_all_results(file_path_strs, args.output)
 
 
 if __name__ == "__main__":
